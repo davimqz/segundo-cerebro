@@ -1,0 +1,4 @@
+# Força quebra de linha LF: scripts com CRLF quebram no bash (hooks e CI).
+* text=auto eol=lf
+*.png binary
+*.jpg binary

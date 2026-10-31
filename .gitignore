@@ -1,0 +1,14 @@
+# Segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Claude Code (configurações pessoais)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Sistema
+.DS_Store
+Thumbs.db

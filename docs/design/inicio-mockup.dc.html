@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Início – Segundo Cérebro</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:inherit}a:hover{opacity:.7}
+.t-light{--surface:#ffffff;--surface-subtle:#fafafa;--text:#0a0a0a;--text-muted:#737373;--title-muted:#a3a3a3;--border:#e5e5e5;--border-strong:#d4d4d4;--on-primary:#ffffff;--primary:#0a0a0a;--success:#15803d;--warning:#a16207;--danger:#b91c1c;--info:#1d4ed8;--warning-bg:#fefce8;--cres:#1d4ed8;--entr:#6d28d9;--cli:#0f766e;--adm:#b45309;--dir:#404040;--cres-bg:#eff6ff;--entr-bg:#f5f3ff;--cli-bg:#f0fdfa;--adm-bg:#fffbeb;--dir-bg:#f5f5f5}
+.t-dark{--surface:#0a0a0a;--surface-subtle:#141414;--text:#fafafa;--text-muted:#a3a3a3;--title-muted:#737373;--border:#262626;--border-strong:#404040;--on-primary:#0a0a0a;--primary:#fafafa;--success:#4ade80;--warning:#facc15;--danger:#f87171;--info:#60a5fa;--warning-bg:#1f1a05;--cres:#93c5fd;--entr:#c4b5fd;--cli:#5eead4;--adm:#fcd34d;--dir:#d4d4d4;--cres-bg:#0b1a33;--entr-bg:#1a1233;--cli-bg:#06231f;--adm-bg:#261a05;--dir-bg:#1c1c1c}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="min-height: 980px; display: flex; flex-wrap: wrap; background: var(--surface); color: var(--text); font-family: 'Geist', 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+<nav aria-label="Menu principal" style="flex: 1 1 232px; max-width: 232px; min-width: 200px; box-sizing: border-box; border-right: 1px solid var(--border); background: var(--surface-subtle); padding: 24px 16px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; align-items: center; gap: 8px; padding: 0 8px">
+<span style="font-size: 18px; font-weight: 500; letter-spacing: -0.03em">A.</span>
+<span style="font-size: 15px; font-weight: 500; letter-spacing: -0.01em">Asttra Labs</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted); padding: 0 8px 4px">DECIDIR</span>
+<a href="#" style="text-decoration: none; padding: 8px; border-radius: 2px; background: var(--surface); border: 1px solid var(--border); font-weight: 500">Início</a>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent; display: flex; justify-content: space-between">Aprovações <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted)">3</span></a>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">Tarefas</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted); padding: 0 8px 4px">OPERAR</span>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">Departamentos</a>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">CRM</a>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">Conhecimento</a>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">Assistente</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted); padding: 0 8px 4px">CONTROLAR</span>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">Atividades</a>
+<a href="#" style="text-decoration: none; padding: 8px; border: 1px solid transparent">Configurações</a>
+</div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 32px 40px 48px; display: flex; flex-direction: column; gap: 24px">
+
+<header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">SÁBADO, 31 DE OUTUBRO</span>
+<h1 style="margin: 0; font-size: 24px; font-weight: 500; letter-spacing: -0.03em">Visão geral <span style="color: var(--title-muted)">da Asttra hoje</span></h1>
+</div>
+<div style="display: flex; gap: 8px; align-items: center">
+<button type="button" style="font: inherit; font-weight: 500; height: 36px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">{{themeLabel}}</button>
+<button type="button" style="font: inherit; font-weight: 500; height: 36px; padding: 0 14px; border-radius: 2px; border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); cursor: pointer">Nova tarefa</button>
+</div>
+</header>
+
+<div role="status" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border: 1px solid var(--warning); background: var(--warning-bg); border-radius: 2px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--warning)">AVISO</span>
+<span style="flex: 1 1 320px">O limite diário dos modelos gratuitos de IA foi atingido. Os agentes retomam amanhã.</span>
+<a href="#" style="font-weight: 500">Ver detalhes</a>
+</div>
+
+<section aria-label="Indicadores" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border)">
+<div style="padding: 16px 20px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">LEADS NOVOS</span>
+<span style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">[0]</span>
+<span style="font-size: 13px; color: var(--text-muted)">nesta semana</span>
+</div>
+<div style="padding: 16px 20px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">PROPOSTAS ABERTAS</span>
+<span style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">[0]</span>
+<span style="font-size: 13px; color: var(--text-muted)">aguardando resposta</span>
+</div>
+<div style="padding: 16px 20px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">TAREFAS ATRASADAS</span>
+<span style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--danger)">[0]</span>
+<span style="font-size: 13px; color: var(--text-muted)">passaram do prazo</span>
+</div>
+<div style="padding: 16px 20px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">APROVAÇÕES</span>
+<span style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--warning)">[0]</span>
+<span style="font-size: 13px; color: var(--text-muted)">esperando você</span>
+</div>
+<div style="padding: 16px 20px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">CONTEÚDOS</span>
+<span style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">[0]</span>
+<span style="font-size: 13px; color: var(--text-muted)">publicados na semana</span>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<section aria-labelledby="apr-title" style="flex: 3 1 480px; min-width: 0; border: 1px solid var(--border)">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border)">
+<h2 id="apr-title" style="margin: 0; font-size: 16px; font-weight: 500">Aprovações pendentes</h2>
+<a href="#" style="font-size: 13px; color: var(--text-muted)">Ver todas</a>
+</div>
+<div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--cres); background: var(--cres-bg); border: 1px solid var(--cres); border-radius: 2px; padding: 3px 8px">CRESCIMENTO</span>
+<span style="font-size: 13px; color: var(--text-muted)">E-mail de resposta a um lead · [Nome do lead]</span>
+</div>
+<p style="margin: 0; color: var(--text-muted)">"Olá, [nome]. Obrigado pelo contato. Podemos marcar a primeira conversa, de até 30 minutos, na próxima semana?"</p>
+<div style="display: flex; gap: 8px">
+<button type="button" style="font: inherit; font-weight: 500; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); cursor: pointer">Aprovar</button>
+<button type="button" style="font: inherit; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">Editar</button>
+<button type="button" style="font: inherit; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">Recusar</button>
+</div>
+</div>
+<div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--entr); background: var(--entr-bg); border: 1px solid var(--entr); border-radius: 2px; padding: 3px 8px">ENTREGA</span>
+<span style="font-size: 13px; color: var(--text-muted)">Atualizar documento de processo · [nome do processo]</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="font: inherit; font-weight: 500; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); cursor: pointer">Aprovar</button>
+<button type="button" style="font: inherit; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">Editar</button>
+<button type="button" style="font: inherit; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">Recusar</button>
+</div>
+</div>
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--adm); background: var(--adm-bg); border: 1px solid var(--adm); border-radius: 2px; padding: 3px 8px">ADMINISTRAÇÃO</span>
+<span style="font-size: 13px; color: var(--text-muted)">Organizar contrato na pasta jurídica · [nome do arquivo]</span>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" style="font: inherit; font-weight: 500; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); cursor: pointer">Aprovar</button>
+<button type="button" style="font: inherit; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">Editar</button>
+<button type="button" style="font: inherit; height: 32px; padding: 0 12px; border-radius: 2px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer">Recusar</button>
+</div>
+</div>
+</section>
+
+<section aria-labelledby="agenda-title" style="flex: 2 1 300px; min-width: 0; border: 1px solid var(--border)">
+<div style="padding: 14px 20px; border-bottom: 1px solid var(--border)">
+<h2 id="agenda-title" style="margin: 0; font-size: 16px; font-weight: 500">Próximos compromissos</h2>
+</div>
+<div style="padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; gap: 16px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-muted); min-width: 44px; padding-top: 2px">[HH:MM]</span>
+<span>[Compromisso do Google Agenda]</span>
+</div>
+<div style="padding: 14px 20px; display: flex; gap: 16px">
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-muted); min-width: 44px; padding-top: 2px">[HH:MM]</span>
+<span>[Compromisso do Google Agenda]</span>
+</div>
+</section>
+</div>
+
+<section aria-labelledby="tar-title" style="border: 1px solid var(--border)">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border)">
+<h2 id="tar-title" style="margin: 0; font-size: 16px; font-weight: 500">Tarefas de hoje</h2>
+<a href="#" style="font-size: 13px; color: var(--text-muted)">Ver todas</a>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 640px; border-collapse: collapse">
+<thead>
+<tr style="text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--text-muted)">
+<th scope="col" style="padding: 10px 20px; border-bottom: 1px solid var(--border); font-weight: 500">TAREFA</th>
+<th scope="col" style="padding: 10px 20px; border-bottom: 1px solid var(--border); font-weight: 500">DEPARTAMENTO</th>
+<th scope="col" style="padding: 10px 20px; border-bottom: 1px solid var(--border); font-weight: 500">RESPONSÁVEL</th>
+<th scope="col" style="padding: 10px 20px; border-bottom: 1px solid var(--border); font-weight: 500">STATUS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)">[Tarefa de exemplo]</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--dir); background: var(--dir-bg); border: 1px solid var(--dir); border-radius: 2px; padding: 3px 8px">DIREÇÃO</span></td>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)">Davi</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)"><span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: var(--danger)"></span>Atrasada</span></td>
+</tr>
+<tr style="background: var(--surface-subtle)">
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)">[Tarefa de exemplo]</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--cres); background: var(--cres-bg); border: 1px solid var(--cres); border-radius: 2px; padding: 3px 8px">CRESCIMENTO</span></td>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)">Agente</td>
+<td style="padding: 12px 20px; border-bottom: 1px solid var(--border)"><span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: var(--info)"></span>Em andamento</span></td>
+</tr>
+<tr>
+<td style="padding: 12px 20px">[Tarefa de exemplo]</td>
+<td style="padding: 12px 20px"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; color: var(--cli); background: var(--cli-bg); border: 1px solid var(--cli); border-radius: 2px; padding: 3px 8px">CLIENTES</span></td>
+<td style="padding: 12px 20px">Davi</td>
+<td style="padding: 12px 20px"><span style="display: inline-flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: var(--success)"></span>Concluída</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"escuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = this.props.escuro ?? false;
+return { themeClass: dark ? 't-dark' : 't-light', themeLabel: dark ? 'Modo claro' : 'Modo escuro' };
+}
+}
+</script>
+</body>
+</html>

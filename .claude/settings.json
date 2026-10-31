@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "asttra-engenharia": {
+      "source": { "source": "github", "repo": "davimqz/asttra-engenharia" }
+    }
+  },
+  "enabledPlugins": {
+    "asttra@asttra-engenharia": true
+  },
+  "permissions": {
+    "deny": ["Read(./.env)", "Read(./**/.env)"]
+  }
+}
