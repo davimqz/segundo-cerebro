@@ -7,19 +7,21 @@ on:
 
 permissions:
   contents: read
+  # O gitleaks-action lista os commits do PR; sem isto dá 403.
+  pull-requests: read
 
 jobs:
   seguranca:
     name: Segurança
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       # Segredos no código e no histórico. Gratuito para contas pessoais.
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -39,7 +41,7 @@ jobs:
     name: Checagem do projeto
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # Configure aqui a stack do projeto (ver perfis/ no repositório asttra-engenharia).
       - name: scripts/check.sh
         run: bash scripts/check.sh

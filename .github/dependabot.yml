@@ -4,4 +4,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Espera 7 dias antes de propor versões recém-publicadas.
+    cooldown:
+      default-days: 7
   # Adicione o ecossistema da stack (npm, pip, cargo...). Ver perfis/.
