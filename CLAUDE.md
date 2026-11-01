@@ -35,7 +35,7 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
    - Toda ação de agente é registrada na tabela `atividades`, que é append-only.
    - Agentes nunca acessam o banco direto: usam a API `/api/v1` ou o MCP do painel.
 
-## Infraestrutura (Etapa 0, quase concluída)
+## Infraestrutura (Etapa 0, concluída)
 
 - **Servidor:** VPS Hostinger KVM 2 com 2 vCPU, 8 GB de RAM e 100 GB NVMe, localizado no Brasil. Sistema Ubuntu 26.04 LTS.
 - **Acesso:** usuário `davi` com sudo, entrando só por chave SSH ed25519. Login root e login por senha estão bloqueados.
@@ -47,10 +47,8 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
 - **Domínio:** `asttralabs.com.br` (Registro.br), com DNS na Cloudflare (dell e harvey).
   - O site fica na Vercel e o e-mail na Hostinger.
   - Os registros existentes ficam em "DNS only". Não mexa neles.
-- **Falta:**
-  - Cloudflare Tunnel.
-  - Cloudflare Access: código por e-mail, lembrando o aparelho por 30 dias.
-  - Backup diário no Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com teste de restauração mensal.
+- **Cloudflare:** Tunnel `vps-asttra` rodando em Docker e Access com código por e-mail, lembrando o aparelho por 30 dias. Testado em `teste.asttralabs.com.br`.
+- **Backup:** diário no Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com teste de restauração mensal. Foi movido para a Etapa 1, item 2, junto com o PostgreSQL, porque ainda não há dados para copiar.
 - **Subdomínios propostos:** `painel.`, `agentes.` (Paperclip) e `automacoes.` (n8n).
 - O IP do servidor não fica neste repositório. Peça ao Davi ou use o alias do `~/.ssh/config`.
 
@@ -130,7 +128,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Subir o repositório `asttra-engenharia` e instalar o plugin (ver o README dele).
-2. Rodar `/asttra:novo-projeto` neste repositório, no modo "repositório existente".
-3. Concluir a Etapa 0: Tunnel, Access e backup no R2.
-4. Começar a Etapa 1, item 1: os repositórios do painel e da base de conhecimento.
+1. Começar a Etapa 1, item 1: os repositórios do painel e da base de conhecimento.

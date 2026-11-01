@@ -14,19 +14,20 @@ O segundo cérebro é construído em etapas pequenas, uma de cada vez, e cada et
 
 ## Etapa 0 – Infraestrutura
 
-O servidor já está protegido; falta concluir a Cloudflare. Os passos estão no [playbook de infraestrutura](https://claude.ai/artifact/89NQPqbvb2mLu962mg371o).
+O servidor está protegido e a Cloudflare (Tunnel e Access) está no ar. Os passos estão no [playbook de infraestrutura](https://claude.ai/artifact/89NQPqbvb2mLu962mg371o).
 
 - [x] VPS contratado, Ubuntu 26.04 atualizado
 - [x] Acesso só por chave SSH, root e senha bloqueados
 - [x] Firewall, Fail2ban e atualizações automáticas
 - [x] Docker instalado
-- [x] DNS migrado para a Cloudflare (Registro.br já aponta para dell e harvey; aguardando a Cloudflare confirmar)
-- [ ] Confirmar ativação e testar site e e-mail
-- [ ] Cloudflare Tunnel no servidor
-- [ ] Cloudflare Access com o e-mail de Davi, lembrando o aparelho por 30 dias
-- [ ] Backup diário para o Cloudflare R2
+- [x] DNS migrado para a Cloudflare (Registro.br aponta para dell e harvey)
+- [x] Confirmar ativação e testar site e e-mail
+- [x] Cloudflare Tunnel no servidor
+- [x] Cloudflare Access com o e-mail de Davi, lembrando o aparelho por 30 dias
 
-**Pronto quando:** um serviço de teste abre em um subdomínio só depois do código da Cloudflare, e um backup aparece no R2.
+O backup diário para o Cloudflare R2 foi movido para a Etapa 1, item 2, porque ainda não há dados para copiar.
+
+**Pronto quando:** um serviço de teste abre em um subdomínio só depois do código da Cloudflare.
 
 ## Etapa 1 – Fundação do painel e dos agentes
 
@@ -34,8 +35,8 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
 
 1. **Repositórios no GitHub:** um para o painel e um para a base de conhecimento, com as pastas dos 5 departamentos.
    - Pronto quando: o Obsidian abre a base e sincroniza com o GitHub.
-2. **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço.
-   - Pronto quando: os serviços conectam, cada um no seu banco.
+2. **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2 (veio da Etapa 0: só agora há dados para copiar).
+   - Pronto quando: os serviços conectam, cada um no seu banco, e um backup aparece no R2.
 3. **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
    - Pronto quando: Davi entra no painel pelo subdomínio e troca entre claro e escuro.
 4. **Temas, parte do MVP:** carregar um design system e trocar o tema ativo.

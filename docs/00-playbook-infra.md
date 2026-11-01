@@ -177,6 +177,20 @@ dig +short DS <dominio>
 18. **Trocar os nameservers no registrador.** No Registro.br: domínio → Alterar servidores DNS → colar os dois nameservers reais da conta Cloudflare. Não preencher DNSSEC nesse momento; ele só é ativado depois, com os valores gerados pela Cloudflare.
 19. **Validar após a propagação:** `whois` mostra os nameservers da Cloudflare, o site abre com e sem `www` e o e-mail envia e recebe.
 
+### Cloudflare Tunnel e Access (executado em 31/10/2026)
+
+20. **Confirmar o DNS ativo na Cloudflare.** O painel da Cloudflare mostra o domínio como ativo.
+21. **Criar o tunnel** (painel da Cloudflare, Zero Trust → Networks → Tunnels). Nome: `vps-asttra`, tipo cloudflared com Docker. Copiar o token mostrado na tela; ele não vai para nenhum documento.
+22. **Guardar o token no servidor** (no servidor, em `~/infra/cloudflared`). O token fica num `.env` com permissão `600` (só o dono lê e escreve). Ele foi digitado com `read -rp` e gravado no `.env`, porque o `nano` deu problema ao colar.
+23. **Subir o tunnel com Docker Compose** (no servidor, em `~/infra/cloudflared`). O `compose.yml` usa `network_mode: host`, para o container alcançar os serviços em `localhost`, e lê o token do `.env`. Subir com `docker compose up -d` e conferir no painel que o tunnel aparece como saudável.
+24. **Criar a rota de teste** (na tela do tunnel: Continue → Routes → Add route). `teste.asttralabs.com.br` → `http://localhost:8080`. A Cloudflare cria sozinha o registro DNS do subdomínio.
+25. **Proteger com o Cloudflare Access** (Zero Trust → Access → Applications):
+    - Aplicação: `Teste`, cobrindo `teste.asttralabs.com.br`.
+    - Policy: `Só Davi`, ação Allow, regra por e-mail `davimqz2003@gmail.com`.
+    - Login por código enviado no e-mail (One-time PIN).
+    - Duração da sessão: 1 mês.
+26. **Testar.** Ao abrir `teste.asttralabs.com.br`, a Cloudflare pede o e-mail, envia o código e, depois do código, abre a página de teste.
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -198,6 +212,7 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | Senha esquecida do usuário | Não foi salva no gerenciador | Como root ou com `sudo`: `passwd davi` |
 | `cls` não funciona no servidor | Comando do Windows | No Linux, usar `clear` |
 | Senha não aparece ao digitar | Comportamento padrão do terminal | Digitar ou colar normalmente e apertar Enter |
+| O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
 
@@ -207,5 +222,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Fail2ban contra tentativas repetidas de acesso
 - [x] Atualizações de segurança automáticas
 - [x] Docker pelo repositório oficial
-- [ ] Cloudflare na frente dos serviços, sem portas abertas
-- [ ] Rotina de backup
+- [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
+- [ ] Rotina de backup (movida para a Etapa 1, junto com o PostgreSQL: ainda não há dados para copiar)
