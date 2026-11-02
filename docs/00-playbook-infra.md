@@ -191,6 +191,166 @@ dig +short DS <dominio>
     - Duração da sessão: 1 mês.
 26. **Testar.** Ao abrir `teste.asttralabs.com.br`, a Cloudflare pede o e-mail, envia o código e, depois do código, abre a página de teste.
 
+## Banco e backup
+
+PostgreSQL 18 (um banco e um usuário por serviço: `painel`, `n8n` e `paperclip`) e Redis 8, em Docker, com backup diário criptografado no Cloudflare R2. Spec: [`specs/001-banco-e-backup.md`](specs/001-banco-e-backup.md). Decisão do backup: [ADR 0003](adr/0003-backup-com-restic-e-healthchecks.md).
+
+Os arquivos ficam em `infra/banco/` neste repositório e são copiados para `/opt/asttra/banco/` no servidor. Os `.env` com senhas existem só no servidor, com permissão `600` e dono `root`. Por isso os comandos `docker compose` nessa pasta usam `sudo`.
+
+Termos: **restic** é o programa de backup (criptografa, guarda só o que mudou e aplica a retenção); **R2** é o armazenamento de arquivos da Cloudflare (gratuito até 10 GB); **Healthchecks.io** é um serviço que manda e-mail quando o backup falha ou não avisa que rodou.
+
+### Instalação (passo a passo)
+
+27. **Criar o bucket e o token do R2** (navegador, painel da Cloudflare → R2). Criar o bucket `asttra-backups`. Em "Manage API tokens", criar um token com permissão "Object Read & Write" só nesse bucket. Guardar no gerenciador de senhas o Access Key ID, o Secret Access Key e o endpoint S3 (`https://<ID_DA_CONTA>.r2.cloudflarestorage.com`). Se a Cloudflare pedir um cartão para ativar o R2, o uso continua no plano gratuito.
+28. **Criar a checagem no Healthchecks.io** (navegador). Conta gratuita (plano Hobby, sem cartão). Nova checagem `asttra-backup`, tipo "Simple", período de 1 dia, tolerância (grace) de 2 horas, fuso `America/Sao_Paulo`, aviso por e-mail. Guardar a URL de ping (`https://hc-ping.com/...`) no gerenciador de senhas.
+29. **Criar a rede Docker compartilhada** (no servidor). Os próximos serviços (painel, n8n, Paperclip) entram nela para falar com o banco.
+
+```bash
+docker network create asttra
+```
+
+30. **Copiar os arquivos** (no Windows, PowerShell, na pasta do repositório). Troque `<alias>` pelo alias do servidor no `~/.ssh/config`.
+
+```powershell
+scp -r infra/banco <alias>:/tmp/banco
+```
+
+31. **Mover para `/opt/asttra/banco`** (no servidor).
+
+```bash
+sudo mkdir -p /opt/asttra
+sudo mv /tmp/banco /opt/asttra/banco
+sudo chown -R root:root /opt/asttra/banco
+sudo chmod +x /opt/asttra/banco/init/*.sh /opt/asttra/banco/backup/*.sh
+```
+
+32. **Criar o `.env` do banco** (no servidor). As senhas são geradas na hora e não aparecem na tela. Os serviços vão ler daqui; para ver uma depois: `sudo cat /opt/asttra/banco/.env`.
+
+```bash
+cd /opt/asttra/banco
+sudo install -m 600 -o root -g root /dev/null .env
+for v in POSTGRES_PASSWORD PAINEL_DB_PASSWORD N8N_DB_PASSWORD PAPERCLIP_DB_PASSWORD REDIS_PASSWORD; do
+  echo "$v=$(openssl rand -hex 32)"
+done | sudo tee .env >/dev/null
+sudo cut -d= -f1 .env
+```
+
+33. **Subir o banco e conferir** (no servidor). Os dois devem aparecer como `healthy`; a porta 5432 só em `127.0.0.1`; nenhuma porta 6379.
+
+```bash
+cd /opt/asttra/banco
+sudo docker compose up -d --wait
+sudo docker compose ps
+sudo ss -tlnp | grep -E '5432|6379'
+```
+
+34. **Conferir o isolamento dos bancos e a senha do Redis** (no servidor). O primeiro `psql` deve mostrar `1`; o segundo deve dar "permission denied for database n8n"; o Redis sem senha deve responder `NOAUTH`.
+
+```bash
+cd /opt/asttra/banco
+SENHA=$(sudo grep '^PAINEL_DB_PASSWORD=' .env | cut -d= -f2)
+sudo docker compose exec -e PGPASSWORD="$SENHA" postgres psql -h 127.0.0.1 -U painel -d painel -Atc 'SELECT 1'
+sudo docker compose exec -e PGPASSWORD="$SENHA" postgres psql -h 127.0.0.1 -U painel -d n8n -Atc 'SELECT 1'
+unset SENHA
+sudo docker compose exec redis redis-cli ping
+```
+
+35. **Instalar o restic** (no servidor).
+
+```bash
+sudo apt update && sudo apt install -y restic
+restic version
+```
+
+36. **Criar o `backup.env`** (no servidor). A senha do restic é gerada e mostrada **uma vez**: copie para o gerenciador de senhas (item "VPS Asttra – senha do restic") antes de continuar. As chaves do R2 e a URL do Healthchecks.io são coladas sem aparecer na tela.
+
+```bash
+cd /opt/asttra/banco/backup
+read -rp "ID da conta Cloudflare (do endpoint do R2): " CONTA
+read -rsp "R2 Access Key ID: " AK; echo
+read -rsp "R2 Secret Access Key: " SK; echo
+read -rsp "URL de ping do Healthchecks.io: " HC; echo
+RP=$(openssl rand -hex 32)
+sudo install -m 600 -o root -g root /dev/null backup.env
+printf 'RESTIC_REPOSITORY=s3:https://%s.r2.cloudflarestorage.com/asttra-backups\nRESTIC_PASSWORD=%s\nAWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\nHC_PING_URL=%s\n' \
+  "$CONTA" "$RP" "$AK" "$SK" "$HC" | sudo tee backup.env >/dev/null
+echo "Senha do restic (guarde agora): $RP"
+unset CONTA AK SK HC RP
+```
+
+37. **Iniciar o repositório restic no R2** (no servidor). Só uma vez.
+
+```bash
+sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic init'
+```
+
+38. **Rodar o primeiro backup à mão** (no servidor). Deve terminar com "Backup concluído" e a checagem do Healthchecks.io fica verde.
+
+```bash
+sudo /opt/asttra/banco/backup/backup.sh
+sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic snapshots'
+```
+
+39. **Instalar e ativar o timer** (no servidor). O backup passa a rodar todo dia às 03:00 de Brasília. Se o servidor estiver desligado nessa hora, roda quando ligar.
+
+```bash
+sudo cp /opt/asttra/banco/backup/asttra-backup.service /opt/asttra/banco/backup/asttra-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now asttra-backup.timer
+systemctl list-timers asttra-backup.timer
+sudo systemctl start asttra-backup.service
+journalctl -u asttra-backup.service -n 30 --no-pager
+```
+
+40. **Testar a restauração** (no servidor). Restaura o último snapshot num banco separado (`restauracao_teste`), compara as linhas de cada tabela com o original e apaga o banco de teste. Deve terminar com "contagens iguais".
+
+```bash
+sudo /opt/asttra/banco/backup/restaurar.sh
+```
+
+41. **Testar o aviso de falha** (no servidor). Com o PostgreSQL parado, o backup deve falhar e o e-mail do Healthchecks.io deve chegar em poucos minutos. Depois, religar e rodar de novo para a checagem voltar ao verde.
+
+```bash
+cd /opt/asttra/banco
+sudo docker compose stop postgres
+sudo systemctl start asttra-backup.service; echo "código: $?"
+sudo docker compose start postgres
+sudo systemctl start asttra-backup.service
+```
+
+42. **Conectar pelo DBeaver** (no Windows, PowerShell). Abre um túnel SSH; enquanto ele estiver aberto, o DBeaver conecta em `localhost:5432`, banco `painel`, usuário `painel`.
+
+```powershell
+ssh -L 5432:127.0.0.1:5432 <alias>
+```
+
+### Atualizar os arquivos depois
+
+Repita o passo 30 e, no servidor, copie por cima sem apagar os `.env`. Se mudou o `compose.yml`, recrie os containers; se mudou o timer, recarregue o systemd. O script `init/01-bancos.sh` só roda com o volume vazio: um banco novo depois disso é criado à mão.
+
+```bash
+sudo cp -r /tmp/banco/. /opt/asttra/banco/ && sudo rm -rf /tmp/banco
+sudo chown -R root:root /opt/asttra/banco
+cd /opt/asttra/banco && sudo docker compose up -d --wait
+```
+
+### Restauração manual mensal
+
+Todo início de mês (lembrete no calendário), no servidor:
+1. Rodar o passo 40 (`restaurar.sh`) e conferir "contagens iguais".
+2. Conferir a lista de snapshots (`restic snapshots`, como no passo 38): deve haver até 7 diários e 4 semanais, o mais novo de hoje.
+3. Conferir no painel do R2 que o bucket `asttra-backups` tem arquivos recentes.
+4. Anotar a data do teste no Build Plan ou no diário de operação.
+
+Para restaurar de verdade um banco perdido: `restic restore latest --host asttra-banco --tag banco --target /tmp/r`, depois `pg_restore` do arquivo `<banco>.dump` no banco recriado (com o serviço dele parado), e o `globals.sql` só se os usuários tiverem sumido.
+
+### Se a senha do restic se perder
+
+Sem a `RESTIC_PASSWORD`, os backups no R2 **não podem ser abertos por ninguém**: são criptografados e não há recuperação.
+- Se o servidor ainda está de pé, a senha está em `/opt/asttra/banco/backup/backup.env`: copie de volta para o gerenciador de senhas.
+- Se o servidor e o gerenciador se perderam juntos, os backups antigos estão perdidos. Com o servidor de pé, crie um repositório novo: apague os arquivos do bucket (com aprovação), gere nova senha (passo 36), rode `restic init` (passo 37) e um backup manual (passo 38).
+- Para trocar a senha com segurança (por exemplo, se vazou): `restic key add` com a nova, atualizar o `backup.env` e o gerenciador, e depois `restic key remove` da antiga.
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -199,6 +359,10 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - **VPS Asttra – senha usuário davi**: usada pelo `sudo`.
 - **VPS Asttra – passphrase chave SSH**: destrava a chave privada.
 - **Backup da chave privada** (`id_ed25519`): opcional, em gerenciador com suporte a chaves SSH (Bitwarden, 1Password). Nunca em e-mail, drive aberto ou chat.
+- **VPS Asttra – senha do restic**: obrigatória. Sem ela nenhum backup pode ser restaurado.
+- **Cloudflare R2 – token asttra-backups**: Access Key ID, Secret Access Key e endpoint.
+- **Healthchecks.io – URL de ping**: a URL da checagem `asttra-backup`.
+- As senhas do PostgreSQL e do Redis ficam só em `/opt/asttra/banco/.env` (geradas no servidor).
 
 Se a chave for perdida, o acesso é recuperado pelo terminal do painel do provedor, instalando uma nova chave pública.
 
@@ -212,6 +376,9 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | Senha esquecida do usuário | Não foi salva no gerenciador | Como root ou com `sudo`: `passwd davi` |
 | `cls` não funciona no servidor | Comando do Windows | No Linux, usar `clear` |
 | Senha não aparece ao digitar | Comportamento padrão do terminal | Digitar ou colar normalmente e apertar Enter |
+| `docker compose` em `/opt/asttra/banco` dá "permission denied" no `.env` | O `.env` é do root, com permissão `600` | Rodar com `sudo docker compose ...` |
+| `network asttra declared as external, but could not be found` | A rede Docker compartilhada não existe | `docker network create asttra` (passo 29) |
+| Mudei a senha no `.env` e o usuário do banco continua com a antiga | O `init/01-bancos.sh` só roda com o volume vazio | Trocar também no banco: `ALTER ROLE <usuario> PASSWORD '...'` pelo `psql` como `postgres` |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
@@ -223,4 +390,4 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Atualizações de segurança automáticas
 - [x] Docker pelo repositório oficial
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
-- [ ] Rotina de backup (movida para a Etapa 1, junto com o PostgreSQL: ainda não há dados para copiar)
+- [ ] Rotina de backup (Etapa 1, item 2: ver "Banco e backup", passos 27 a 42)

@@ -1,0 +1,17 @@
+# Backup diário do PostgreSQL para o R2. Disparado por asttra-backup.timer.
+# Instalação: sudo cp asttra-backup.{service,timer} /etc/systemd/system/
+# Logs: journalctl -u asttra-backup.service
+[Unit]
+Description=Backup do PostgreSQL da Asttra para o Cloudflare R2 (restic)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/asttra/banco/backup/backup.sh
+# O restic guarda o cache aqui, para não baixar os índices do R2 a cada execução.
+Environment=RESTIC_CACHE_DIR=/var/cache/restic
+CacheDirectory=restic
+Nice=10
+IOSchedulingClass=idle

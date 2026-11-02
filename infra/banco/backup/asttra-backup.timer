@@ -1,0 +1,14 @@
+# Dispara o backup todo dia às 03:00 de Brasília.
+# Ativação: sudo systemctl daemon-reload && sudo systemctl enable --now asttra-backup.timer
+# Próxima execução: systemctl list-timers asttra-backup.timer
+[Unit]
+Description=Backup diário do PostgreSQL às 03:00 (America/Sao_Paulo)
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Sao_Paulo
+# Se o servidor estava desligado às 03:00, roda o backup perdido quando voltar.
+Persistent=true
+RandomizedDelaySec=0
+
+[Install]
+WantedBy=timers.target

@@ -48,7 +48,8 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
   - O site fica na Vercel e o e-mail na Hostinger.
   - Os registros existentes ficam em "DNS only". Não mexa neles.
 - **Cloudflare:** Tunnel `vps-asttra` rodando em Docker e Access com código por e-mail, lembrando o aparelho por 30 dias. Testado em `teste.asttralabs.com.br`.
-- **Backup:** diário no Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com teste de restauração mensal. Foi movido para a Etapa 1, item 2, junto com o PostgreSQL, porque ainda não há dados para copiar.
+- **Backup:** diário às 03:00 com restic no bucket `asttra-backups` do Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com alerta pelo Healthchecks.io e teste de restauração mensal manual ([ADR 0003](docs/adr/0003-backup-com-restic-e-healthchecks.md)). Arquivos em `infra/banco/backup/`; instalação no servidor pendente (Etapa 1, item 2).
+- **Banco:** PostgreSQL 18 e Redis 8 em `/opt/asttra/banco/` (cópia de `infra/banco/`), na rede Docker `asttra`. PostgreSQL só em `127.0.0.1:5432`; Redis sem porta publicada.
 - **Subdomínios propostos:** `painel.`, `agentes.` (Paperclip) e `automacoes.` (n8n).
 - O IP do servidor não fica neste repositório. Peça ao Davi ou use o alias do `~/.ssh/config`.
 
@@ -82,8 +83,8 @@ Não use "Sustentação" como nome de departamento: é o nome do contrato mensal
 - Nada específico da Asttra (nome, domínio, e-mails, departamentos) fica fixo no código: vem de `.env` ou do banco, para a estrutura poder ser replicada.
 - Instalar: a definir
 - Rodar localmente: a definir
-- Checagem completa (lint, tipos e testes rápidos): `scripts/check.sh` (ainda sem checagem configurada)
-- Testes de integração/E2E: a definir
+- Checagem completa (lint, tipos e testes rápidos): `scripts/check.sh` (ShellCheck nos scripts e, se houver docker e restic, o teste do banco)
+- Testes de integração: `scripts/teste-banco.sh` (sobe `infra/banco` com senhas de teste; roda sempre no CI). E2E: a definir
 
 ## Design
 
@@ -129,4 +130,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Começar a Etapa 1, item 2: PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2.
+1. Concluir a Etapa 1, item 2: rodar no servidor o capítulo "Banco e backup" do playbook (passos 27 a 42) e conferir a verificação de ponta a ponta da spec 001.
