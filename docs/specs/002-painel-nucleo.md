@@ -2,7 +2,7 @@
 
 - Risco: R2 (login e sessão, migração de banco, segredos, infraestrutura)
 - Origem: Build Plan, Etapa 1, item 3; App Flow ("Telas do MVP"); Backend ("Tabelas do núcleo"); Design Brief
-- Status: Rascunho
+- Status: Aprovada (2026-11-02)
 
 ## Objetivo
 Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.asttralabs.com.br`, atrás do Cloudflare Access. Ele terá o login próprio com e-mail e senha, o menu com as 9 telas, o tema Selecta lido do banco nos modos claro e escuro, as seis tabelas do núcleo, a faixa de avisos e a tela Atividades. É a casca em que as verticais (Etapa 2) e a ponte do Hermes (item 7) vão entrar.
@@ -62,8 +62,15 @@ Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.astt
 - `scripts/check.sh` e `.github/workflows/ci.yml`: passam a incluir lint, tipos e testes do painel.
 - Docs: playbook (capítulo "Painel"), Build Plan, `CLAUDE.md` (comandos de instalar e rodar) e `05-backend-schema.md` (campos finais).
 
+## Formato do tema (conferido em 2026-11-02)
+O `tokens.json` do Selecta tem `color.themes` (lista de modos) e `color.tokens` (lista de `{ name, value, usage }`), em que `value` é uma cor só ou `{ light, dark }`. Também tem `type` (`families` e `groups` de estilos), `spacing`, `radius` e `shadow`, todos como listas de `{ name, value, usage }`.
+
+Ele só tem o modo claro e usa os nomes da landing (`bg`, `ink`, `line`). Por isso:
+- o `temas/schema.ts` aceita exatamente esse formato, e o item 4 vai carregar arquivos nele;
+- o `seed/temas/selecta.json` usa esse formato, com os temas `light` e `dark` e os nomes semânticos do Design Brief (`surface`, `text`, `border`, `status-*`, `tag-*`) com os valores de lá;
+- quando falta um token obrigatório do painel, a validação recusa o tema e diz qual falta.
+
 ## Perguntas em aberto
-- **Formato do `tokens.json` do Selecta:** o schema dos temas deve aceitar o arquivo exportado pelo design system. É preciso baixá-lo do artifact do Selecta e conferir antes de fechar o `temas/schema.ts`.
 - **pnpm:** é o gerenciador de pacotes proposto. Falta confirmar.
 - **Porta 3000:** falta confirmar que ela está livre no servidor. O túnel usa `network_mode: host` e alcança `localhost:3000`.
 
