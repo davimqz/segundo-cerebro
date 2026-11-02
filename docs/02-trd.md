@@ -74,7 +74,7 @@ Dados estruturados ficam no PostgreSQL; conhecimento fica em arquivos Markdown n
 
 **Base de conhecimento (Markdown + Git)**
 
-- Um repositório privado no GitHub, com as pastas por departamento definidas no PRD.
+- Um repositório privado no GitHub (`davimqz/asttra-conhecimento`), com as pastas por departamento definidas no PRD.
 - O servidor mantém uma cópia local, que o Hermes lê e na qual propõe alterações.
 - Davi edita pelo Obsidian, sincronizando com o mesmo repositório pelo plugin Obsidian Git.
 - Alterações feitas por agentes entram como commits identificados, para revisão no histórico.
