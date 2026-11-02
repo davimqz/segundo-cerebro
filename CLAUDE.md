@@ -79,12 +79,14 @@ Não use "Sustentação" como nome de departamento: é o nome do contrato mensal
 
 ## Stack e comandos
 
-- Stack: TypeScript + Next.js + PostgreSQL (ver "Stack decidida"). O app fica na pasta `painel/` deste repositório (ADR 0002) e ainda não foi criado.
+- Stack: TypeScript + Next.js 16 + PostgreSQL (ver "Stack decidida"), com pnpm. O app fica em `painel/` (ADR 0002) e a implantação em `infra/painel/`. Login com Better Auth (ADR 0004); imagem construída no servidor (ADR 0005).
 - Nada específico da Asttra (nome, domínio, e-mails, departamentos) fica fixo no código: vem de `.env` ou do banco, para a estrutura poder ser replicada.
-- Instalar: a definir
-- Rodar localmente: a definir
-- Checagem completa (lint, tipos e testes rápidos): `scripts/check.sh` (ShellCheck nos scripts e, se houver docker e restic, o teste do banco)
-- Testes de integração: `scripts/teste-banco.sh` (sobe `infra/banco` com senhas de teste; roda sempre no CI). E2E: a definir
+- Instalar: `pnpm --dir painel install`
+- Rodar localmente: copiar `painel/.env.example` para `painel/.env` (banco em `127.0.0.1:5432`), depois `pnpm --dir painel db:migrar`, `pnpm --dir painel usuario criar` e `pnpm --dir painel dev`
+- Migração nova: mudar `painel/src/core/db/schema.ts` e rodar `pnpm --dir painel db:gerar`. Nunca edite uma migração já aplicada
+- Checagem completa (lint, tipos e testes rápidos): `scripts/check.sh` (ShellCheck; tipos, lint, formatação e testes de unidade do painel; com docker, os testes de integração do painel; com docker e restic, o teste do banco)
+- Testes de integração: `scripts/teste-painel.sh` (PostgreSQL descartável) e `scripts/teste-banco.sh` (sobe `infra/banco` com senhas de teste); os dois rodam sempre no CI
+- E2E: `scripts/teste-e2e.sh` (sobe banco e painel pelo `infra/painel/compose.yml` e roda o Playwright; precisa de `pnpm --dir painel exec playwright install chromium`)
 
 ## Design
 
@@ -131,4 +133,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 ## Próximo passo
 
 1. Fechar a Etapa 1, item 2: conferir em 2026-11-03 o snapshot automático das 03:00 (no servidor: `sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic snapshots'`, horário 06:00 UTC) e marcar o item como concluído no Build Plan, no playbook e aqui.
-2. Depois, a Etapa 1, item 3: painel, núcleo.
+2. Etapa 1, item 3 (painel, núcleo): o app está pronto (spec 002). Falta implantar no servidor e criar a rota e o Access (playbook, capítulo "Painel", passos 43 a 53) e conferir o "Pronto quando".

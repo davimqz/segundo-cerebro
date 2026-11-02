@@ -394,6 +394,113 @@ Sem a `RESTIC_PASSWORD`, os backups no R2 **não podem ser abertos por ninguém*
 - Se o servidor e o gerenciador se perderam juntos, os backups antigos estão perdidos. Com o servidor de pé, crie um repositório novo: apague os arquivos do bucket (com aprovação), gere nova senha (passo 36), rode `restic init` (passo 37) e um backup manual (passo 38).
 - Para trocar a senha com segurança (por exemplo, se vazou): `restic key add` com a nova, atualizar o `backup.env` e o gerenciador, e depois `restic key remove` da antiga.
 
+## Painel
+
+O app do painel (Next.js) roda num container no servidor, atrás do Cloudflare Tunnel e do Cloudflare Access, com login próprio por e-mail e senha. Spec: [`specs/002-painel-nucleo.md`](specs/002-painel-nucleo.md). Decisões: [ADR 0004](adr/0004-login-do-painel-com-better-auth.md) (login com Better Auth) e [ADR 0005](adr/0005-imagem-do-painel-construida-no-servidor.md) (imagem construída no servidor).
+
+O código fica em `painel/` e a implantação em `infra/painel/` neste repositório. No servidor:
+- `/opt/asttra/painel-src`: cópia do repositório, atualizada com `git pull` por uma **chave de deploy** (chave SSH que só lê este repositório no GitHub);
+- `/opt/asttra/painel`: cópia de `infra/painel/`, com o `.env` (permissão `600`, dono `root`).
+
+O container escuta só em `127.0.0.1:18000`, roda as migrações do banco antes de abrir e responde em `/api/saude` para o healthcheck. O sistema de arquivos do container é só de leitura.
+
+### Instalação (a executar)
+
+43. **Conferir que a porta está livre** (no servidor). Não deve aparecer nada.
+
+```bash
+ss -tlnp | grep ':18000'
+```
+
+44. **Criar a chave de deploy** (no servidor, como davi). Ela não tem senha porque o `git pull` roda sem ninguém digitar; por isso só tem leitura e só neste repositório.
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/painel-deploy -N "" -C "painel-deploy@vps-asttra"
+printf 'Host github-painel\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/painel-deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+chmod 600 ~/.ssh/config
+cat ~/.ssh/painel-deploy.pub
+```
+
+45. **Cadastrar a chave no GitHub** (navegador). Repositório `davimqz/segundo-cerebro` → Settings → Deploy keys → Add deploy key. Título `vps-asttra`, colar a linha do `cat` acima e **deixar desmarcado** "Allow write access".
+46. **Clonar o repositório** (no servidor). Na primeira conexão, o SSH pergunta se confia no GitHub: confira se a impressão digital é `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU` (a chave ED25519 publicada pelo GitHub) e responda `yes`.
+
+```bash
+sudo mkdir -p /opt/asttra/painel-src
+sudo chown davi:davi /opt/asttra/painel-src
+git clone git@github-painel:davimqz/segundo-cerebro.git /opt/asttra/painel-src
+```
+
+47. **Copiar a implantação para `/opt/asttra/painel`** (no servidor).
+
+```bash
+sudo cp -r /opt/asttra/painel-src/infra/painel /opt/asttra/painel
+sudo chown -R root:root /opt/asttra/painel
+```
+
+48. **Criar o `.env` do painel** (no servidor). O segredo das sessões é gerado na hora e a senha do banco vem do `.env` do banco; nada aparece na tela. O último comando mostra só os nomes das variáveis.
+
+```bash
+cd /opt/asttra/painel
+sudo install -m 600 -o root -g root /dev/null .env
+sudo bash -c 'S=$(grep "^PAINEL_DB_PASSWORD=" /opt/asttra/banco/.env | cut -d= -f2-); cat > /opt/asttra/painel/.env <<EOF
+DATABASE_URL=postgres://painel:$S@postgres:5432/painel
+BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+BETTER_AUTH_URL=https://painel.asttralabs.com.br
+PAINEL_NOME=Asttra Labs
+SESSAO_DIAS=1
+PAINEL_PORTA=18000
+TZ=America/Sao_Paulo
+PAINEL_SRC=/opt/asttra/painel-src/painel
+EOF'
+sudo cut -d= -f1 .env
+```
+
+49. **Construir a imagem e subir** (no servidor). O primeiro build leva alguns minutos e usa bastante CPU. Deve terminar com o `painel` como `healthy` e a porta 18000 só em `127.0.0.1`.
+
+```bash
+cd /opt/asttra/painel
+sudo docker compose up -d --build --wait
+sudo docker compose ps
+ss -tlnp | grep ':18000'
+```
+
+50. **Criar o usuário do painel** (no servidor). Pede o e-mail, o nome e a senha (duas vezes, sem aparecer na tela, mínimo de 12 caracteres). Guarde a senha no gerenciador como "Painel – login do Davi".
+
+```bash
+cd /opt/asttra/painel
+sudo docker compose exec painel pnpm usuario criar
+```
+
+51. **Criar a rota no tunnel** (navegador, Zero Trust → Networks → Tunnels → `vps-asttra` → Published application routes → Add). `painel.asttralabs.com.br` → `http://localhost:18000`. A Cloudflare cria o registro DNS sozinha.
+52. **Proteger com o Cloudflare Access** (Zero Trust → Access → Applications → Add → Self-hosted). Nome `Painel`, domínio `painel.asttralabs.com.br`, a policy `Só Davi` (a mesma do teste), login por código no e-mail, sessão de 1 mês.
+53. **Testar** (no servidor e depois no navegador, no celular e no computador):
+    - `sudo docker compose exec painel pnpm aviso criar --tipo alerta --mensagem "Teste"` termina sem erro;
+    - `https://painel.asttralabs.com.br` pede primeiro o código da Cloudflare e depois o login do painel;
+    - uma senha errada mostra "E-mail ou senha incorretos"; a certa abre a Início com a faixa "Teste";
+    - Resolver faz a faixa sumir, e a tela Atividades mostra `login` e `aviso_resolvido`;
+    - o botão troca entre claro e escuro, e a escolha continua depois de recarregar;
+    - Sair volta para `/entrar`, e abrir `/atividades` direto também leva para `/entrar`.
+
+### Atualizar o painel
+
+Fora do horário de uso (o build pesa no servidor por alguns minutos), no servidor:
+
+```bash
+cd /opt/asttra/painel-src && git pull
+cd /opt/asttra/painel && sudo docker compose up -d --build --wait
+```
+
+Se o `infra/painel/compose.yml` mudou, copie antes por cima, sem apagar o `.env`: `sudo cp /opt/asttra/painel-src/infra/painel/compose.yml /opt/asttra/painel/`.
+
+### Trocar ou recuperar a senha do painel
+
+No servidor. Encerra todas as sessões abertas. Também dá para trocar pela tela Configurações, que pede a senha atual.
+
+```bash
+cd /opt/asttra/painel
+sudo docker compose exec painel pnpm usuario senha
+```
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -406,6 +513,7 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - **Cloudflare R2 – token asttra-backups-restic**: Access Key ID, Secret Access Key e o ID da conta (só os valores, sem rótulos).
 - **Healthchecks.io – URL de ping**: a URL da checagem `asttra-backup`.
 - As senhas do PostgreSQL e do Redis ficam só em `/opt/asttra/banco/.env` (geradas no servidor).
+- **Painel – login do Davi**: e-mail e senha do login próprio do painel (passo 50). O segredo das sessões (`BETTER_AUTH_SECRET`) fica só em `/opt/asttra/painel/.env`.
 
 Se a chave for perdida, o acesso é recuperado pelo terminal do painel do provedor, instalando uma nova chave pública.
 
@@ -428,6 +536,9 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | Chave com caracteres a mais (ex.: 68 em vez de 64) | Rótulo salvo junto no gerenciador (`Key=...`) | Salvar só o valor no gerenciador e repetir o `read` daquela chave. Se o `read` acabou de rodar (antes do `unset`), `SK=${SK#Key=}` remove o prefixo |
 | `restic init` ou `curl` no R2 dá `Unauthorized` | Access Key ID errado (por exemplo, o ID da conta no lugar), Secret de outro token ou token sem acesso ao bucket | Criar token novo e trocar as chaves ("Trocar as chaves do R2") |
 | `journalctl -u asttra-backup.service` mostra "No entries" | O log do sistema só aparece com permissão de administrador | `sudo journalctl ...` |
+| O build do painel para com "Killed" ou "JavaScript heap out of memory" | Faltou memória no servidor durante o `next build` | Rodar o build fora do horário de uso; se repetir, rever o ADR 0005 (gatilho "falta de memória") |
+| O painel fica `unhealthy` e o log mostra "Falha nas migrações" | O `DATABASE_URL` está errado ou o banco não está na rede `asttra` | Conferir o `.env` (passo 48) e o `sudo docker compose ps` em `/opt/asttra/banco` |
+| O login responde "Muitas tentativas" | Muitas tentativas do mesmo IP em 15 minutos | Esperar 15 minutos; se esqueceu a senha, trocar pelo servidor ("Trocar ou recuperar a senha do painel") |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
@@ -439,4 +550,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Atualizações de segurança automáticas
 - [x] Docker pelo repositório oficial
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
+- [ ] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53)
 - [ ] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; falta confirmar o primeiro backup automático das 03:00)

@@ -30,20 +30,24 @@ Cada módulo tem as próprias tabelas, as regras num arquivo de serviço e regis
 
 ## Tabelas do núcleo
 
-Seis tabelas sustentam o painel desde o primeiro dia; os campos são uma proposta e podem mudar na construção.
+Seis tabelas sustentam o painel desde o primeiro dia. Os campos abaixo são os implementados na spec 002 (`painel/src/core/db/schema.ts`).
 
-| Tabela | Guarda | Campos principais |
+| Tabela | Guarda | Campos |
 | --- | --- | --- |
-| `departamentos` | Os 5 departamentos e suas áreas | id, nome, ordem, áreas (lista) |
-| `temas` | Design systems instalados | id, nome, tokens (JSON no formato do Selecta), ativo, padrão, criado em |
-| `atividades` | Registro de tudo o que agentes e Davi fizeram | id, quando, autor (Davi ou agente), departamento, ação, alvo, aprovado por, detalhes (JSON) |
-| `avisos` | Avisos do sistema mostrados no topo | id, tipo (alerta ou erro), mensagem, origem, aberto ou resolvido |
-| `integracoes` | Status das conexões externas | id, serviço (Gmail, Telegram etc.), status, última verificação |
-| `configuracoes` | Preferências do painel | chave, valor |
+| `departamentos` | Os 5 departamentos e suas áreas | id, slug (usado no token de cor `tag-<slug>`), nome, ordem, areas (JSON, lista) |
+| `temas` | Design systems instalados | id, nome, tokens (JSON no formato do Selecta), ativo, padrao, criado_em. Só um ativo e só um padrão por vez |
+| `atividades` | Registro de tudo o que agentes e Davi fizeram | id, quando, autor_tipo (`usuario`, `agente` ou `sistema`), autor_id, departamento_id, acao, alvo, aprovado_por, detalhes (JSON) |
+| `avisos` | Avisos do sistema mostrados no topo | id, tipo (`alerta` ou `erro`), mensagem, origem, criado_em, resolvido_em, resolvido_por. Aberto é `resolvido_em` vazio |
+| `integracoes` | Status das conexões externas | id, servico, status, ultima_verificacao |
+| `configuracoes` | Preferências do painel | chave, valor (JSON) |
+
+O login (Better Auth, [ADR 0004](adr/0004-login-do-painel-com-better-auth.md)) tem as próprias tabelas: `usuarios`, `sessoes`, `contas` (com o hash argon2id da senha), `verificacoes` e `limites_tentativas` (o limite de tentativas de login por IP).
+
+Ações gravadas em `atividades` pelo núcleo: `login`, `logout`, `senha_trocada`, `usuario_criado`, `aviso_criado` e `aviso_resolvido`.
 
 Regras:
 
-- `atividades` só recebe inclusões: nada é editado nem apagado, para servir de trilha de auditoria.
+- `atividades` só recebe inclusões: nada é editado nem apagado, para servir de trilha de auditoria. Um gatilho no PostgreSQL recusa `UPDATE`, `DELETE` e `TRUNCATE`.
 - Senhas e chaves de serviços externos não ficam no banco: ficam nos arquivos de ambiente do servidor; `integracoes` guarda só o status.
 - Toda tabela de vertical terá `departamento_id`, para cada dado aparecer no departamento certo.
 

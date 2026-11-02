@@ -14,4 +14,20 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
-  # Adicione o ecossistema da stack (npm, pip, cargo...). Ver perfis/.
+  # Dependências do painel (pnpm). Mudanças pequenas agrupadas num PR só.
+  - package-ecosystem: npm
+    directory: /painel
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      dependencias:
+        update-types: [minor, patch]
+  # Imagem base do painel (painel/Dockerfile).
+  - package-ecosystem: docker
+    directory: /painel
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
