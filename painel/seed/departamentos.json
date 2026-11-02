@@ -1,0 +1,12 @@
+[
+  { "slug": "crescimento", "nome": "Crescimento", "ordem": 1, "areas": ["Comercial", "Marketing"] },
+  { "slug": "entrega", "nome": "Entrega", "ordem": 2, "areas": ["Produto", "Tecnologia", "Operações"] },
+  { "slug": "clientes", "nome": "Clientes", "ordem": 3, "areas": ["Atendimento"] },
+  {
+    "slug": "administracao",
+    "nome": "Administração",
+    "ordem": 4,
+    "areas": ["Financeiro", "Administrativo", "Jurídico", "RH"]
+  },
+  { "slug": "direcao", "nome": "Direção", "ordem": 5, "areas": ["Estratégia", "Dados"] }
+]

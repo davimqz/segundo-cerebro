@@ -2,7 +2,7 @@
 
 - Risco: R2 (login e sessão, migração de banco, segredos, infraestrutura)
 - Origem: Build Plan, Etapa 1, item 3; App Flow ("Telas do MVP"); Backend ("Tabelas do núcleo"); Design Brief
-- Status: Aprovada (2026-11-02)
+- Status: Implementada (2026-11-02); falta a implantação no servidor (passos 7 e 8 do plano)
 
 ## Objetivo
 Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.asttralabs.com.br`, atrás do Cloudflare Access. Ele terá o login próprio com e-mail e senha, o menu com as 9 telas, o tema Selecta lido do banco nos modos claro e escuro, as seis tabelas do núcleo, a faixa de avisos e a tela Atividades. É a casca em que as verticais (Etapa 2) e a ponte do Hermes (item 7) vão entrar.
@@ -63,12 +63,23 @@ Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.astt
 - Docs: playbook (capítulo "Painel"), Build Plan, `CLAUDE.md` (comandos de instalar e rodar) e `05-backend-schema.md` (campos finais).
 
 ## Formato do tema (conferido em 2026-11-02)
-O `tokens.json` do Selecta tem `color.themes` (lista de modos) e `color.tokens` (lista de `{ name, value, usage }`), em que `value` é uma cor só ou `{ light, dark }`. Também tem `type` (`families` e `groups` de estilos), `spacing`, `radius` e `shadow`, todos como listas de `{ name, value, usage }`.
+O `tokens.json` do Selecta tem `name`, `version`, `color.themes` (lista de modos `{ id, name }`) e `color.tokens` (lista de `{ name, value, usage }`), em que `value` é uma cor só ou `{ light, dark }`. Também tem `type` (`families`, um mapa como `{ sans, mono }`, e `groups` de estilos), e `spacing`, `radius` e `shadow`, cada um como `{ tokens: [{ name, value, usage }] }`. (Formato conferido de novo no arquivo original na implementação, em 2026-11-02.)
 
 Ele só tem o modo claro e usa os nomes da landing (`bg`, `ink`, `line`). Por isso:
 - o `temas/schema.ts` aceita exatamente esse formato, e o item 4 vai carregar arquivos nele;
 - o `seed/temas/selecta.json` usa esse formato, com os temas `light` e `dark` e os nomes semânticos do Design Brief (`surface`, `text`, `border`, `status-*`, `tag-*`) com os valores de lá;
 - quando falta um token obrigatório do painel, a validação recusa o tema e diz qual falta.
+
+## Notas da implementação (2026-11-02)
+Decisões tomadas na construção, dentro do escopo aprovado:
+- **Limite de tentativas:** é o do Better Auth, 5 pedidos de login por IP a cada 15 minutos. Ele conta todos os pedidos do IP, inclusive os certos, e não só os errados. Na prática, para uma pessoa só, o efeito é o mesmo.
+- **Rotas desligadas do Better Auth:** além do cadastro, ficam desligadas (404) a troca de e-mail e de dados do usuário, a exclusão de conta, a recuperação de senha e a verificação de e-mail. A telemetria do Better Auth fica desligada.
+- **Atividades:** além de `login`, `logout`, `senha_trocada` e `aviso_resolvido`, o núcleo grava `usuario_criado` e `aviso_criado`. O gatilho também recusa `TRUNCATE`.
+- **Tema:** o Selecta da seed tem o token extra `title-muted` (segunda parte dos títulos, como no mockup). As fontes Geist e IBM Plex Mono vêm embutidas no painel (servidas por ele mesmo); quando um tema pede uma delas, o painel usa a embutida.
+- **Telas:** o menu usa o grupo "Sistema", como no App Flow (o mockup dizia "Controlar"). O botão "Nova tarefa" do mockup ficou de fora até existirem tarefas. As telas provisórias mostram: Aprovações e Tarefas, Etapa 1, item 5; Departamentos, Etapa 2, item 2; CRM, Etapa 2, item 1; Conhecimento, Etapa 1, item 9; Assistente, Etapa 1, item 7.
+- **Next.js:** o `cacheComponents` (padrão novo do Next 16) fica desligado, porque toda tela depende da sessão e do banco a cada pedido.
+- **Imagem Docker:** o servidor do Next fica em `/app/servidor` e os comandos (`pnpm usuario`, `pnpm aviso`) são scripts empacotados. O container tem o sistema de arquivos só de leitura, `no-new-privileges` e 768 MB de memória. O compose lê a pasta do código de `PAINEL_SRC` (no servidor, `/opt/asttra/painel-src/painel`).
+- **Testes:** `scripts/teste-painel.sh` (integração, PostgreSQL descartável) entra no `scripts/check.sh`; `scripts/teste-e2e.sh` sobe o banco e o painel pelo próprio `infra/painel/compose.yml` e roda o Playwright (job "E2E do painel" no CI).
 
 ## Perguntas em aberto
 - Nenhuma. Decididos em 2026-11-02:

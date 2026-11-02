@@ -1,0 +1,41 @@
+# Painel (Next.js). No servidor fica em /opt/asttra/painel/ (cópia desta pasta), com o .env ao lado.
+# A imagem é construída no próprio servidor a partir do repositório em /opt/asttra/painel-src (ADR 0005).
+# Precisa da rede "asttra" e do PostgreSQL de infra/banco no ar.
+#
+# Atualizar: cd /opt/asttra/painel-src && git pull && cd /opt/asttra/painel && sudo docker compose up -d --build
+
+services:
+  painel:
+    build:
+      context: ${PAINEL_SRC:-../../painel}
+    image: asttra-painel:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # O DATABASE_URL vem do .env; aqui só o que não é segredo.
+      NODE_ENV: production
+      BETTER_AUTH_TELEMETRY: "0"
+    # Só no 127.0.0.1: o Docker ignora o UFW. O Cloudflare Tunnel (network_mode: host) chega por aqui.
+    ports:
+      - "127.0.0.1:${PAINEL_PORTA:-18000}:3000"
+    mem_limit: 768m
+    read_only: true
+    # Sistema de arquivos só de leitura; o que o Next e o pnpm precisam gravar fica em memória.
+    tmpfs:
+      - /tmp
+      - /app/servidor/.next/cache:uid=1000,gid=1000
+      - /home/node:uid=1000,gid=1000
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/saude').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - asttra
+
+networks:
+  asttra:
+    external: true

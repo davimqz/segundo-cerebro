@@ -1,0 +1,10 @@
+{
+  "name": "painel",
+  "private": true,
+  "description": "package.json da imagem Docker: só os comandos de linha que rodam no servidor.",
+  "scripts": {
+    "db:migrar": "node servidor/dist-scripts/migrar.mjs",
+    "usuario": "node servidor/dist-scripts/usuario.mjs",
+    "aviso": "node servidor/dist-scripts/aviso.mjs"
+  }
+}

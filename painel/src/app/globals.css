@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/*
+ * As telas usam só tokens semânticos. Os valores vêm do tema ativo (tabela temas), que o layout
+ * injeta como variáveis --t-* (src/core/temas/css.ts). Aqui o Tailwind ganha os nomes semânticos.
+ * As cores e fontes padrão do Tailwind ficam desligadas para ninguém usar valor fixo por engano.
+ */
+@theme inline {
+  --color-*: initial;
+  --font-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  --color-surface: var(--t-surface);
+  --color-surface-subtle: var(--t-surface-subtle);
+  --color-text: var(--t-text);
+  --color-text-muted: var(--t-text-muted);
+  --color-title-muted: var(--t-title-muted, var(--t-text-muted));
+  --color-border: var(--t-border);
+  --color-border-strong: var(--t-border-strong);
+  --color-status-success: var(--t-status-success);
+  --color-status-warning: var(--t-status-warning);
+  --color-status-danger: var(--t-status-danger);
+  --color-status-info: var(--t-status-info);
+  /* Cor de uma tag ou faixa, definida no próprio elemento (style="--cor: ..."). */
+  --color-cor: var(--cor, var(--t-text-muted));
+  --color-transparent: transparent;
+
+  --font-sans: var(--t-font-sans);
+  --font-mono: var(--t-font-mono);
+
+  --radius-none: var(--t-radius-none);
+  --radius-xs: var(--t-radius-xs);
+
+  --shadow-overlay: var(--t-shadow-overlay, none);
+}
+
+@layer base {
+  html {
+    background: var(--t-surface);
+    color: var(--t-text);
+    font-family: var(--t-font-sans);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--t-border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--t-text);
+    outline-offset: 2px;
+  }
+}
+
+@utility rotulo {
+  /* Estilo "label" do Design Brief: mono, 11px, caixa alta, espaçado. */
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@utility numeros-tabulares {
+  font-variant-numeric: tabular-nums;
+}
