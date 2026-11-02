@@ -2,7 +2,7 @@
 
 - Risco: R2 (login e sessão, migração de banco, segredos, infraestrutura)
 - Origem: Build Plan, Etapa 1, item 3; App Flow ("Telas do MVP"); Backend ("Tabelas do núcleo"); Design Brief
-- Status: Rascunho
+- Status: Aprovada (2026-11-02)
 
 ## Objetivo
 Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.asttralabs.com.br`, atrás do Cloudflare Access. Ele terá o login próprio com e-mail e senha, o menu com as 9 telas, o tema Selecta lido do banco nos modos claro e escuro, as seis tabelas do núcleo, a faixa de avisos e a tela Atividades. É a casca em que as verticais (Etapa 2) e a ponte do Hermes (item 7) vão entrar.
@@ -36,7 +36,7 @@ Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.astt
 - Quando `pnpm aviso criar` roda, o script deve criar um aviso. Ele serve para testar antes de existir a API.
 
 **Implantação**
-- Quando `docker compose up -d` roda em `/opt/asttra/painel/`, o container deve ficar `healthy` (rota `/api/saude`), escutar só em `127.0.0.1:3000` e rodar as migrações antes de abrir.
+- Quando `docker compose up -d` roda em `/opt/asttra/painel/`, o container deve ficar `healthy` (rota `/api/saude`), escutar só em `127.0.0.1:${PAINEL_PORTA}` (padrão 18000) e rodar as migrações antes de abrir.
 - As respostas devem levar os cabeçalhos CSP, HSTS e `X-Content-Type-Options`. Erros para o usuário devem ser genéricos.
 
 ## Fora de escopo
@@ -57,15 +57,23 @@ Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.astt
 - `painel/seed/`: `departamentos.json` e `temas/selecta.json`. São dados do modelo padrão, editáveis por cliente.
 - `painel/src/app/`: `(publico)/entrar`, `(painel)/layout.tsx` (sessão, barra lateral, faixa de avisos, modo) e as 9 telas, mais `api/auth/[...all]` e `api/saude`.
 - `painel/scripts/usuario.ts` e `painel/scripts/aviso.ts`: comandos de linha para o servidor.
-- `painel/Dockerfile` (saída `standalone`, usuário sem root) e `painel/.env.example`, com `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `PAINEL_NOME` e `SESSAO_DIAS`.
-- `infra/painel/compose.yml`: build a partir de `../../painel`, rede externa `asttra` (banco em `postgres:5432`), porta `127.0.0.1:3000:3000`, `mem_limit` e healthcheck.
+- `painel/Dockerfile` (saída `standalone`, usuário sem root) e `painel/.env.example`, com `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `PAINEL_NOME`, `SESSAO_DIAS` e `PAINEL_PORTA`.
+- `infra/painel/compose.yml`: build a partir de `../../painel`, rede externa `asttra` (banco em `postgres:5432`), porta `127.0.0.1:${PAINEL_PORTA}:3000` (padrão 18000), `mem_limit` e healthcheck.
 - `scripts/check.sh` e `.github/workflows/ci.yml`: passam a incluir lint, tipos e testes do painel.
 - Docs: playbook (capítulo "Painel"), Build Plan, `CLAUDE.md` (comandos de instalar e rodar) e `05-backend-schema.md` (campos finais).
 
+## Formato do tema (conferido em 2026-11-02)
+O `tokens.json` do Selecta tem `color.themes` (lista de modos) e `color.tokens` (lista de `{ name, value, usage }`), em que `value` é uma cor só ou `{ light, dark }`. Também tem `type` (`families` e `groups` de estilos), `spacing`, `radius` e `shadow`, todos como listas de `{ name, value, usage }`.
+
+Ele só tem o modo claro e usa os nomes da landing (`bg`, `ink`, `line`). Por isso:
+- o `temas/schema.ts` aceita exatamente esse formato, e o item 4 vai carregar arquivos nele;
+- o `seed/temas/selecta.json` usa esse formato, com os temas `light` e `dark` e os nomes semânticos do Design Brief (`surface`, `text`, `border`, `status-*`, `tag-*`) com os valores de lá;
+- quando falta um token obrigatório do painel, a validação recusa o tema e diz qual falta.
+
 ## Perguntas em aberto
-- **Formato do `tokens.json` do Selecta:** o schema dos temas deve aceitar o arquivo exportado pelo design system. É preciso baixá-lo do artifact do Selecta e conferir antes de fechar o `temas/schema.ts`.
-- **pnpm:** é o gerenciador de pacotes proposto. Falta confirmar.
-- **Porta 3000:** falta confirmar que ela está livre no servidor. O túnel usa `network_mode: host` e alcança `localhost:3000`.
+- Nenhuma. Decididos em 2026-11-02:
+  - **pnpm** como gerenciador de pacotes.
+  - **Porta 18000** no servidor, configurável por `PAINEL_PORTA`. A 3000 está ocupada. A 18000 fica acima das portas padrão dos programas e abaixo da faixa que o Linux usa sozinho nas conexões de saída (32768 a 60999). O túnel usa `network_mode: host` e alcança `localhost:18000`.
 
 ## Plano
 1. **No Windows:** criar `painel/` com Next.js, TypeScript, Tailwind, shadcn/ui, ESLint, Vitest e Playwright. Ligar lint, tipos e testes no `scripts/check.sh` e no CI.
@@ -74,8 +82,8 @@ Criar o app do painel em `painel/` (ADR 0002) e colocá-lo no ar em `painel.astt
 4. Ligar o Better Auth (tabelas, argon2id, limite de tentativas, sessão, sem cadastro), a tela `/entrar`, o `exigirSessao()` e os scripts `usuario` e `aviso`.
 5. Montar o layout com a barra lateral, a faixa de avisos e o botão de modo. Criar as 9 telas: Início pelo mockup, Atividades com a lista e Configurações com o modo, a troca de senha e o Sair.
 6. Criar o `Dockerfile`, o `infra/painel/compose.yml` e a rota `/api/saude`, e testar o container localmente.
-7. **No servidor:** clonar o repositório em `/opt/asttra/painel-src`, criar o `.env` com `BETTER_AUTH_SECRET` gerado por `openssl rand` e subir o compose. Depois, rodar `pnpm usuario criar` dentro do container.
-8. **No navegador:** criar a rota `painel.asttralabs.com.br` → `http://localhost:3000` no tunnel `vps-asttra` e a aplicação "Painel" no Access, só com o e-mail do Davi.
+7. **No servidor:** conferir com `ss -tlnp | grep ':18000'` que a porta está livre, clonar o repositório em `/opt/asttra/painel-src`, criar o `.env` com `BETTER_AUTH_SECRET` gerado por `openssl rand` e subir o compose. Depois, rodar `pnpm usuario criar` dentro do container.
+8. **No navegador:** criar a rota `painel.asttralabs.com.br` → `http://localhost:18000` no tunnel `vps-asttra` e a aplicação "Painel" no Access, só com o e-mail do Davi.
 9. **No Windows:** atualizar o playbook, o Build Plan, o `CLAUDE.md` e o backend-schema, criar os ADRs aprovados e abrir o PR, que só entra com a sua aprovação.
 
 ADRs propostos (criar com `/asttra:adr` depois da sua aprovação):
@@ -105,7 +113,7 @@ ADRs propostos (criar com `/asttra:adr` depois da sua aprovação):
 
 ## Verificação de ponta a ponta
 No servidor:
-1. `sudo docker compose ps` em `/opt/asttra/painel` mostra o `painel` como `healthy`. `ss -tlnp` mostra a porta 3000 só em `127.0.0.1`.
+1. `sudo docker compose ps` em `/opt/asttra/painel` mostra o `painel` como `healthy`. `ss -tlnp` mostra a porta 18000 só em `127.0.0.1`.
 2. `sudo docker compose exec painel pnpm aviso criar --tipo alerta --mensagem "Teste"` termina sem erro.
 
 No navegador (celular e computador):
