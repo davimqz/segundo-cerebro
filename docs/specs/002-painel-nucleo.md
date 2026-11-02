@@ -86,9 +86,9 @@ Ele só tem o modo claro e usa os nomes da landing (`bg`, `ink`, `line`). Por is
 8. **No navegador:** criar a rota `painel.asttralabs.com.br` → `http://localhost:18000` no tunnel `vps-asttra` e a aplicação "Painel" no Access, só com o e-mail do Davi.
 9. **No Windows:** atualizar o playbook, o Build Plan, o `CLAUDE.md` e o backend-schema, criar os ADRs aprovados e abrir o PR, que só entra com a sua aprovação.
 
-ADRs propostos (criar com `/asttra:adr` depois da sua aprovação):
-- **0004:** login do painel com Better Auth e argon2id, no lugar do Auth.js ou de uma implementação própria.
-- **0005:** imagem do painel construída no servidor, e não no GitHub Actions com GHCR.
+ADRs aceitos:
+- [0004](../adr/0004-login-do-painel-com-better-auth.md): login do painel com Better Auth e argon2id.
+- [0005](../adr/0005-imagem-do-painel-construida-no-servidor.md): imagem do painel construída no servidor, com o repositório clonado por chave de deploy só de leitura.
 
 **Testes previstos:**
 - Unidade (Vitest):
