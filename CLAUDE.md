@@ -61,7 +61,7 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
 | Automação | n8n + `n8n-mcp` + `n8n-skills` |
 | Painel | Next.js + TypeScript + PostgreSQL + Drizzle + Redis, com shadcn/ui e ícones Lucide |
 | Banco | Uma instância PostgreSQL com um banco por serviço: `painel`, `n8n` e `paperclip` |
-| Conhecimento | Markdown + Git em repositório separado, lido no Obsidian (plugin Obsidian Git) e mapeado pelo Graphify |
+| Conhecimento | Markdown + Git no repositório `davimqz/asttra-conhecimento`, lido no Obsidian (plugin Obsidian Git) e mapeado pelo Graphify |
 | Login | Duas camadas: primeiro o Cloudflare Access, depois o login próprio do painel com e-mail e senha |
 
 **Agentes:** há um único agente permanente, o Hermes. Os 5 departamentos são papéis no Paperclip.
@@ -78,7 +78,8 @@ Não use "Sustentação" como nome de departamento: é o nome do contrato mensal
 
 ## Stack e comandos
 
-- Stack: TypeScript + Next.js + PostgreSQL (ver "Stack decidida"). O app ainda não foi criado.
+- Stack: TypeScript + Next.js + PostgreSQL (ver "Stack decidida"). O app fica na pasta `painel/` deste repositório (ADR 0002) e ainda não foi criado.
+- Nada específico da Asttra (nome, domínio, e-mails, departamentos) fica fixo no código: vem de `.env` ou do banco, para a estrutura poder ser replicada.
 - Instalar: a definir
 - Rodar localmente: a definir
 - Checagem completa (lint, tipos e testes rápidos): `scripts/check.sh` (ainda sem checagem configurada)
@@ -128,4 +129,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Começar a Etapa 1, item 1: os repositórios do painel e da base de conhecimento.
+1. Começar a Etapa 1, item 2: PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2.

@@ -33,8 +33,8 @@ O backup diário para o Cloudflare R2 foi movido para a Etapa 1, item 2, porque 
 
 Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e vê tudo registrado no painel, ainda sem as verticais.
 
-1. **Repositórios no GitHub:** um para o painel e um para a base de conhecimento, com as pastas dos 5 departamentos.
-   - Pronto quando: o Obsidian abre a base e sincroniza com o GitHub.
+1. [x] **Repositórios no GitHub:** o painel fica neste repositório, na pasta `painel/` ([ADR 0002](adr/0002-painel-no-repositorio-do-projeto.md)), e a base de conhecimento em `davimqz/asttra-conhecimento` (privado), com as pastas dos 5 departamentos.
+   - Pronto quando: o Obsidian abre a base e sincroniza com o GitHub. Testado em 2026-11-02 com o plugin Obsidian Git.
 2. **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2 (veio da Etapa 0: só agora há dados para copiar).
    - Pronto quando: os serviços conectam, cada um no seu banco, e um backup aparece no R2.
 3. **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
