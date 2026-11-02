@@ -38,6 +38,7 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
 2. **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2 (veio da Etapa 0: só agora há dados para copiar).
    - Pronto quando: os serviços conectam, cada um no seu banco, e um backup aparece no R2.
    - Spec: [001](specs/001-banco-e-backup.md). Arquivos em `infra/banco/`; passo a passo no playbook, capítulo "Banco e backup".
+   - Andamento (2026-11-02): instalado no servidor. Conferidos: containers `healthy`, portas, isolamento dos bancos, `NOAUTH` no Redis, backup manual e pelo systemd no R2, restauração com contagens iguais, e-mail de falha do Healthchecks.io e acesso pelo DBeaver via túnel. Falta: o snapshot automático das 03:00 de 2026-11-03.
 3. **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
    - Pronto quando: Davi entra no painel pelo subdomínio e troca entre claro e escuro.
 4. **Temas, parte do MVP:** carregar um design system e trocar o tema ativo.

@@ -199,29 +199,46 @@ Os arquivos ficam em `infra/banco/` neste repositório e são copiados para `/op
 
 Termos: **restic** é o programa de backup (criptografa, guarda só o que mudou e aplica a retenção); **R2** é o armazenamento de arquivos da Cloudflare (gratuito até 10 GB); **Healthchecks.io** é um serviço que manda e-mail quando o backup falha ou não avisa que rodou.
 
-### Instalação (passo a passo)
+### Instalação (executada em 02/11/2026)
 
-27. **Criar o bucket e o token do R2** (navegador, painel da Cloudflare → R2). Criar o bucket `asttra-backups`. Em "Manage API tokens", criar um token com permissão "Object Read & Write" só nesse bucket. Guardar no gerenciador de senhas o Access Key ID, o Secret Access Key e o endpoint S3 (`https://<ID_DA_CONTA>.r2.cloudflarestorage.com`). Se a Cloudflare pedir um cartão para ativar o R2, o uso continua no plano gratuito.
-28. **Criar a checagem no Healthchecks.io** (navegador). Conta gratuita (plano Hobby, sem cartão). Nova checagem `asttra-backup`, tipo "Simple", período de 1 dia, tolerância (grace) de 2 horas, fuso `America/Sao_Paulo`, aviso por e-mail. Guardar a URL de ping (`https://hc-ping.com/...`) no gerenciador de senhas.
+Antes de começar:
+- **Acesso ao servidor:** `<servidor>` nos comandos é `davi@<IP>`, ou o alias, se houver um no `~/.ssh/config` do Windows. Sem alias, o IP fica no painel da Hostinger (VPS → visão geral) e deve ser anotado no item "VPS Asttra" do gerenciador de senhas.
+- **Colar no terminal:** use o **botão direito do mouse** (ou Ctrl+Shift+V no Windows Terminal). O Ctrl+V não cola: ele manda um caractere invisível, e um `read -s` recebe 0 ou 1 caractere sem avisar.
+- **Um comando por vez:** colar vários blocos juntos pode embaralhar a ordem (aparecem `^[[200~` na tela) ou rodar os comandos fora de ordem.
+- **Salvar só os valores** no gerenciador de senhas, sem rótulos como `Key=` ou "Senha:". Um rótulo grudado vai junto na colagem e quebra a chave.
+
+27. **Criar o bucket e o token do R2** (navegador, painel da Cloudflare → R2).
+    - Criar o bucket `asttra-backups`, na jurisdição padrão (sem `.eu.` no endereço).
+    - Em "Manage API tokens", escolher **Create Account API token** (pertence à conta, não ao usuário). Nome `asttra-backups-restic`, permissão **Object Read & Write**, "Apply to specific buckets only" → `asttra-backups`, TTL Forever, sem filtro de IP.
+    - A tela final mostra três valores. O backup usa só dois: o **Access Key ID** (32 caracteres) e o **Secret Access Key** (64 caracteres, só aparece nessa tela). O "Token value" não é usado.
+    - Guardar os dois no gerenciador, mais o **ID da conta**: os 32 caracteres logo depois de `dash.cloudflare.com/` na barra de endereço, ou o "Account ID" na página do R2. **O ID da conta não é o Access Key ID**, embora os dois tenham 32 caracteres.
+    - Se a Cloudflare pedir um cartão para ativar o R2, o uso continua no plano gratuito.
+28. **Criar a checagem no Healthchecks.io** (navegador). Conta gratuita (plano Hobby, sem cartão). **Add Check** → nome `asttra-backup`, tipo "Simple", período (Period) de 1 dia, tolerância (Grace) de 2 horas, aviso por e-mail ligado. A **URL de ping** (`https://hc-ping.com/<código>`) aparece ao clicar na checagem; é o endereço que o script chama para avisar início, sucesso e falha. Guardar no gerenciador: quem tem a URL pode mandar avisos falsos.
 29. **Criar a rede Docker compartilhada** (no servidor). Os próximos serviços (painel, n8n, Paperclip) entram nela para falar com o banco.
 
 ```bash
 docker network create asttra
 ```
 
-30. **Copiar os arquivos** (no Windows, PowerShell, na pasta do repositório). Troque `<alias>` pelo alias do servidor no `~/.ssh/config`.
+30. **Copiar os arquivos** (no Windows, PowerShell). Primeiro entrar na pasta do repositório e atualizar a `main`; só depois o `scp`, senão ele não acha `infra/banco`.
 
 ```powershell
-scp -r infra/banco <alias>:/tmp/banco
+cd "C:\Users\Davi Oliveira\Asttra-Labs\segundo-cerebro"
+git checkout main
+git pull
+scp -r infra/banco <servidor>:/tmp/banco
 ```
 
-31. **Mover para `/opt/asttra/banco`** (no servidor).
+31. **Mover para `/opt/asttra/banco` e acertar as permissões** (no servidor). O `scp` do Windows cria a pasta só com acesso para o dono; depois do `chown root`, o PostgreSQL (que roda como outro usuário no container) não conseguiria ler o `init/`. Por isso as permissões são definidas com `find` e `sudo` (um `*.sh` sem sudo não funciona: quem expande o `*` é o shell do davi, que não lê a pasta).
 
 ```bash
 sudo mkdir -p /opt/asttra
 sudo mv /tmp/banco /opt/asttra/banco
 sudo chown -R root:root /opt/asttra/banco
-sudo chmod +x /opt/asttra/banco/init/*.sh /opt/asttra/banco/backup/*.sh
+sudo find /opt/asttra/banco -type d -exec chmod 755 {} +
+sudo find /opt/asttra/banco -type f -exec chmod 644 {} +
+sudo find /opt/asttra/banco -name '*.sh' -exec chmod 755 {} +
+sudo ls -laR /opt/asttra/banco
 ```
 
 32. **Criar o `.env` do banco** (no servidor). As senhas são geradas na hora e não aparecem na tela. Os serviços vão ler daqui; para ver uma depois: `sudo cat /opt/asttra/banco/.env`.
@@ -235,7 +252,7 @@ done | sudo tee .env >/dev/null
 sudo cut -d= -f1 .env
 ```
 
-33. **Subir o banco e conferir** (no servidor). Os dois devem aparecer como `healthy`; a porta 5432 só em `127.0.0.1`; nenhuma porta 6379.
+33. **Subir o banco e conferir** (no servidor). Os dois devem aparecer como `healthy`; a porta 5432 só em `127.0.0.1`; nenhuma porta 6379 no `ss`. No `ps`, o Redis aparece como `6379/tcp` sem `->`: a porta existe só dentro da rede Docker, sem publicação no servidor.
 
 ```bash
 cd /opt/asttra/banco
@@ -262,20 +279,31 @@ sudo apt update && sudo apt install -y restic
 restic version
 ```
 
-36. **Criar o `backup.env`** (no servidor). A senha do restic é gerada e mostrada **uma vez**: copie para o gerenciador de senhas (item "VPS Asttra – senha do restic") antes de continuar. As chaves do R2 e a URL do Healthchecks.io são coladas sem aparecer na tela.
+36. **Criar o `backup.env`** (no servidor). As chaves do R2 e a URL do Healthchecks.io são coladas (botão direito) sem aparecer na tela; cada `read` mostra em seguida quantos caracteres recebeu, para conferir na hora. Rode um comando por vez.
 
 ```bash
 cd /opt/asttra/banco/backup
-read -rp "ID da conta Cloudflare (do endpoint do R2): " CONTA
-read -rsp "R2 Access Key ID: " AK; echo
-read -rsp "R2 Secret Access Key: " SK; echo
-read -rsp "URL de ping do Healthchecks.io: " HC; echo
+read -rp "ID da conta Cloudflare: " CONTA; echo "-> ${#CONTA} caracteres (esperado 32)"
+read -rsp "R2 Access Key ID: " AK; echo " -> ${#AK} caracteres (esperado 32)"
+read -rsp "R2 Secret Access Key: " SK; echo " -> ${#SK} caracteres (esperado 64)"
+read -rsp "URL de ping do Healthchecks.io: " HC; echo " -> ${#HC} caracteres (esperado mais de 30)"
+[[ $CONTA =~ ^[0-9a-f]{32}$ && $AK =~ ^[0-9a-f]{32}$ && $SK =~ ^[0-9a-f]{64}$ && $AK != "$CONTA" ]] && echo "formato ok" || echo "ERRO: repita o read do valor errado"
+```
+
+Só com "formato ok", gere a senha do restic e grave o arquivo. A senha aparece **uma vez**: copie só o valor para o gerenciador de senhas (item "VPS Asttra – senha do restic") antes de continuar.
+
+```bash
 RP=$(openssl rand -hex 32)
 sudo install -m 600 -o root -g root /dev/null backup.env
-printf 'RESTIC_REPOSITORY=s3:https://%s.r2.cloudflarestorage.com/asttra-backups\nRESTIC_PASSWORD=%s\nAWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\nHC_PING_URL=%s\n' \
-  "$CONTA" "$RP" "$AK" "$SK" "$HC" | sudo tee backup.env >/dev/null
+printf 'RESTIC_REPOSITORY=s3:https://%s.r2.cloudflarestorage.com/asttra-backups\nRESTIC_PASSWORD=%s\nAWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\nHC_PING_URL=%s\n' "$CONTA" "$RP" "$AK" "$SK" "$HC" | sudo tee backup.env >/dev/null
 echo "Senha do restic (guarde agora): $RP"
-unset CONTA AK SK HC RP
+unset CONTA AK SK HC RP; sudo cut -d= -f1 backup.env; ls -la backup.env
+```
+
+Antes do `restic init`, testar se o R2 aceita as chaves (troque `<ID_DA_CONTA>`). As credenciais vão para o `curl` pela entrada padrão (`-K -`), para não aparecerem na lista de processos. O esperado é uma resposta começando com `<ListBucketResult`; `Unauthorized` quer dizer chave errada ou token sem acesso ao bucket (ver "Trocar as chaves do R2", abaixo).
+
+```bash
+sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; printf "user = \"%s:%s\"\n" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" | curl -s -K - --aws-sigv4 "aws:amz:auto:s3" "https://<ID_DA_CONTA>.r2.cloudflarestorage.com/asttra-backups?list-type=2&max-keys=1"; echo'
 ```
 
 37. **Iniciar o repositório restic no R2** (no servidor). Só uma vez.
@@ -291,7 +319,7 @@ sudo /opt/asttra/banco/backup/backup.sh
 sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic snapshots'
 ```
 
-39. **Instalar e ativar o timer** (no servidor). O backup passa a rodar todo dia às 03:00 de Brasília. Se o servidor estiver desligado nessa hora, roda quando ligar.
+39. **Instalar e ativar o timer** (no servidor). O backup passa a rodar todo dia às 03:00 de Brasília. Se o servidor estiver desligado nessa hora, roda quando ligar. O servidor está em UTC, então o `list-timers` mostra **06:00 UTC**. O `journalctl` precisa de `sudo`; sem ele, aparece "No entries".
 
 ```bash
 sudo cp /opt/asttra/banco/backup/asttra-backup.service /opt/asttra/banco/backup/asttra-backup.timer /etc/systemd/system/
@@ -299,8 +327,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now asttra-backup.timer
 systemctl list-timers asttra-backup.timer
 sudo systemctl start asttra-backup.service
-journalctl -u asttra-backup.service -n 30 --no-pager
+sudo journalctl -u asttra-backup.service -n 30 --no-pager
 ```
+
+Enquanto houver menos de 7 dias de cópias, o restic guarda também a mais antiga ("oldest daily snapshot"), então dois backups no mesmo dia ficam os dois. A partir do 8º dia, sobra uma por dia.
 
 40. **Testar a restauração** (no servidor). Restaura o último snapshot num banco separado (`restauracao_teste`), compara as linhas de cada tabela com o original e apaga o banco de teste. Deve terminar com "contagens iguais".
 
@@ -318,10 +348,20 @@ sudo docker compose start postgres
 sudo systemctl start asttra-backup.service
 ```
 
-42. **Conectar pelo DBeaver** (no Windows, PowerShell). Abre um túnel SSH; enquanto ele estiver aberto, o DBeaver conecta em `localhost:5432`, banco `painel`, usuário `painel`.
+42. **Conectar pelo DBeaver** (no Windows, PowerShell; opcional). Abre um túnel SSH, que precisa ficar aberto enquanto o DBeaver estiver em uso.
 
 ```powershell
-ssh -L 5432:127.0.0.1:5432 <alias>
+ssh -L 5432:127.0.0.1:5432 <servidor>
+```
+
+No DBeaver: Nova conexão (ícone de tomada com +) → PostgreSQL → Host `localhost`, Port `5432`, Database `painel`, Username `painel`. A senha é o valor depois do `=` em `sudo grep PAINEL_DB_PASSWORD /opt/asttra/banco/.env` (no servidor; o sudo pede a senha do usuário davi). Não precisa ir para o gerenciador: ela fica no `.env` e o DBeaver pode lembrar ("Save password").
+
+### Trocar as chaves do R2
+
+Para trocar o token (chave errada, vazada ou revogada) sem refazer o `backup.env`: criar o token novo como no passo 27 e, no servidor, rodar a linha abaixo. Ela pede as duas chaves, mostra o tamanho recebido e só grava se o formato estiver certo; a senha do restic e a URL de ping continuam iguais. Depois, repetir o teste do `curl` do passo 36 e apagar o token antigo na Cloudflare e no gerenciador.
+
+```bash
+sudo bash -c 'umask 077; f=/opt/asttra/banco/backup/backup.env; read -rsp "Novo Access Key ID: " AK; echo " -> recebi ${#AK} caracteres (esperado 32)"; read -rsp "Novo Secret Access Key: " SK; echo " -> recebi ${#SK} caracteres (esperado 64)"; [[ $AK =~ ^[0-9a-f]{32}$ && $SK =~ ^[0-9a-f]{64}$ ]] || { echo "Formato errado, nada foi alterado."; exit 1; }; grep -vE "^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)=" "$f" > "$f.novo"; printf "AWS_ACCESS_KEY_ID=%s\nAWS_SECRET_ACCESS_KEY=%s\n" "$AK" "$SK" >> "$f.novo"; mv "$f.novo" "$f"; echo "Chaves trocadas."'
 ```
 
 ### Atualizar os arquivos depois
@@ -331,6 +371,9 @@ Repita o passo 30 e, no servidor, copie por cima sem apagar os `.env`. Se mudou 
 ```bash
 sudo cp -r /tmp/banco/. /opt/asttra/banco/ && sudo rm -rf /tmp/banco
 sudo chown -R root:root /opt/asttra/banco
+sudo find /opt/asttra/banco -type d -exec chmod 755 {} +
+sudo find /opt/asttra/banco -type f ! -name '*.env' ! -name '.env' -exec chmod 644 {} +
+sudo find /opt/asttra/banco -name '*.sh' -exec chmod 755 {} +
 cd /opt/asttra/banco && sudo docker compose up -d --wait
 ```
 
@@ -360,7 +403,7 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - **VPS Asttra – passphrase chave SSH**: destrava a chave privada.
 - **Backup da chave privada** (`id_ed25519`): opcional, em gerenciador com suporte a chaves SSH (Bitwarden, 1Password). Nunca em e-mail, drive aberto ou chat.
 - **VPS Asttra – senha do restic**: obrigatória. Sem ela nenhum backup pode ser restaurado.
-- **Cloudflare R2 – token asttra-backups**: Access Key ID, Secret Access Key e endpoint.
+- **Cloudflare R2 – token asttra-backups-restic**: Access Key ID, Secret Access Key e o ID da conta (só os valores, sem rótulos).
 - **Healthchecks.io – URL de ping**: a URL da checagem `asttra-backup`.
 - As senhas do PostgreSQL e do Redis ficam só em `/opt/asttra/banco/.env` (geradas no servidor).
 
@@ -379,6 +422,12 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | `docker compose` em `/opt/asttra/banco` dá "permission denied" no `.env` | O `.env` é do root, com permissão `600` | Rodar com `sudo docker compose ...` |
 | `network asttra declared as external, but could not be found` | A rede Docker compartilhada não existe | `docker network create asttra` (passo 29) |
 | Mudei a senha no `.env` e o usuário do banco continua com a antiga | O `init/01-bancos.sh` só roda com o volume vazio | Trocar também no banco: `ALTER ROLE <usuario> PASSWORD '...'` pelo `psql` como `postgres` |
+| `chmod: cannot access '/opt/asttra/banco/init/*.sh'` e `ls: Permission denied` | O `scp` criou a pasta só para o dono; depois do `chown root`, o shell do davi não lê a pasta nem expande o `*` | Acertar as permissões com `sudo find ... -exec chmod` (passo 31) |
+| `scp: stat local "infra/banco": No such file or directory` | O `scp` rodou fora da pasta do repositório | `cd` para a pasta do repositório antes (passo 30) |
+| `read -s` recebe 0 ou 1 caractere | O Ctrl+V não cola no terminal | Colar com o botão direito do mouse (ou Ctrl+Shift+V) |
+| Chave com caracteres a mais (ex.: 68 em vez de 64) | Rótulo salvo junto no gerenciador (`Key=...`) | Salvar só o valor no gerenciador e repetir o `read` daquela chave. Se o `read` acabou de rodar (antes do `unset`), `SK=${SK#Key=}` remove o prefixo |
+| `restic init` ou `curl` no R2 dá `Unauthorized` | Access Key ID errado (por exemplo, o ID da conta no lugar), Secret de outro token ou token sem acesso ao bucket | Criar token novo e trocar as chaves ("Trocar as chaves do R2") |
+| `journalctl -u asttra-backup.service` mostra "No entries" | O log do sistema só aparece com permissão de administrador | `sudo journalctl ...` |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
@@ -390,4 +439,4 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Atualizações de segurança automáticas
 - [x] Docker pelo repositório oficial
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
-- [ ] Rotina de backup (Etapa 1, item 2: ver "Banco e backup", passos 27 a 42)
+- [ ] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; falta confirmar o primeiro backup automático das 03:00)
