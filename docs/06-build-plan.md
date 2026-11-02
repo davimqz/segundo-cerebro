@@ -37,6 +37,7 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
    - Pronto quando: o Obsidian abre a base e sincroniza com o GitHub. Testado em 2026-11-02 com o plugin Obsidian Git.
 2. **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2 (veio da Etapa 0: só agora há dados para copiar).
    - Pronto quando: os serviços conectam, cada um no seu banco, e um backup aparece no R2.
+   - Spec: [001](specs/001-banco-e-backup.md). Arquivos em `infra/banco/`; passo a passo no playbook, capítulo "Banco e backup".
 3. **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
    - Pronto quando: Davi entra no painel pelo subdomínio e troca entre claro e escuro.
 4. **Temas, parte do MVP:** carregar um design system e trocar o tema ativo.
@@ -78,6 +79,10 @@ Depois do MVP, na ordem que Davi decidir:
 - **Replicação:** empacotar tudo como modelo implantável no servidor de um cliente, a partir do playbook.
 
 Ideias registradas, só quando Davi pedir: resumo diário, revisão semanal e follow-up automático de leads.
+
+Ideias de infraestrutura (da spec 001):
+- **Bucket Lock no R2:** impedir que os backups sejam apagados antes do prazo, mesmo com a chave do R2 vazada.
+- **Mover o Cloudflare Tunnel** de `~/infra/cloudflared` para `/opt/asttra/`, junto com os outros serviços.
 
 ## Perguntas em aberto
 

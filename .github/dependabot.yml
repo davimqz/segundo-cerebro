@@ -7,4 +7,11 @@ updates:
     # Espera 7 dias antes de propor versões recém-publicadas.
     cooldown:
       default-days: 7
+  # Imagens do PostgreSQL e do Redis em infra/banco/compose.yml.
+  - package-ecosystem: docker-compose
+    directory: /infra/banco
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
   # Adicione o ecossistema da stack (npm, pip, cargo...). Ver perfis/.

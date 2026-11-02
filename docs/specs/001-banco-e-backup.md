@@ -67,6 +67,14 @@ Neste repositório, copiados para `/opt/asttra/banco/` no servidor:
 - **Healthchecks.io:** período de 1 dia e tolerância de 2 horas. Uma falha avisa na hora, pela URL `/fail`.
 - **Redis:** uma senha só, compartilhada pelos serviços internos, sem usuários separados (ACL).
 
+## Mudanças na implementação (2026-11-02)
+- **Dependabot:** ecossistema `docker-compose` em vez de `docker`, porque o `docker` só lê Dockerfiles.
+- **`sudo docker compose`:** como o `.env` é do root com permissão `600`, os comandos do compose em `/opt/asttra/banco` usam `sudo`.
+- **Senha do Redis:** vai para um arquivo em tmpfs incluído na config (`--include`), e não para a linha de comando, para não aparecer no `ps`.
+- **Retenção:** `restic forget` usa `--group-by host,tags`. Sem isso, o caminho temporário, que muda a cada execução, impediria a retenção de apagar cópias. Há um teste para esse caso.
+- **R2:** o playbook ganhou o passo de criar o bucket `asttra-backups` e o token, que o plano não citava.
+- **`.gitignore`:** passou a ignorar `*.env` (protege o `backup.env`), mantendo os `*.env.example`.
+
 ## Perguntas em aberto
 - Nenhuma.
 
