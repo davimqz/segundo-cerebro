@@ -19,6 +19,7 @@ Em Configurações › Aparência, Davi vê os temas instalados, carrega um desi
 - Quando já existe um tema com o mesmo `name` (sem diferenciar maiúsculas e minúsculas, ignorando espaços nas pontas), o sistema deve recusar com "Já existe um tema com esse nome" e não gravar nada.
 - Quando o arquivo válido não tem algum token opcional, o sistema deve instalar e avisar quais faltam e que eles vão usar a cor de texto secundário. São opcionais o `title-muted` e um `tag-<slug>` para cada departamento da tabela `departamentos`; os slugs vêm do banco, não do código.
 - Quando um valor tenta fechar a regra CSS ou carregar algo de fora (`;`, `{`, `}`, `<`, `>`, `\`, `url(`, `@`, `expression(`), a validação deve recusar o arquivo.
+- **Acrescentado na revisão (2026-11-03):** quando um valor abre ou fecha um comentário (`/*`, `*/`) ou deixa uma aspa sem fechar, a validação também deve recusar o arquivo. Esses valores não injetam nada, mas engolem o resto do CSS e podem deixar o painel ilegível depois de "Ativar".
 
 **Ativar**
 - Quando Davi clica em "Ativar" num tema, o sistema deve, numa única transação, desativar o anterior, ativar o escolhido e gravar `tema_ativado` em `atividades`, com o nome em `alvo` e o tema anterior em `detalhes`. As cores, as fontes e os cantos do painel devem mudar no próximo carregamento, sem rebuild.

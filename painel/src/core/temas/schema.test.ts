@@ -136,6 +136,36 @@ describe("validarTema", () => {
       expect(validarTema(tema).ok).toBe(true);
     });
   });
+
+  describe("valores que desligariam o resto do CSS", () => {
+    // Não injetam nada, mas um comentário aberto ou uma aspa sem fechar engolem as regras seguintes.
+    const quebram = ["/* x", "rgb(0 0 0 /* x)", "#fff */", '"Geist', "'Geist", "\"Geist', sans-serif"];
+
+    it.each(quebram)("recusa a cor %j", (valor) => {
+      const tema = copia();
+      tema.color.tokens[0].value = { light: valor, dark: "#000000" };
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it.each(quebram)("recusa a família de fonte %j", (valor) => {
+      const tema = copia();
+      tema.type.families.sans = valor;
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it.each(quebram)("recusa a sombra %j", (valor) => {
+      const tema = copia();
+      tema.shadow.tokens[0].value = `0 1px 2px ${valor}`;
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it("aceita aspas fechadas, inclusive um apóstrofo dentro de aspas duplas", () => {
+      const tema = copia();
+      tema.type.families.sans = `"O'Reilly Sans", 'Inter', sans-serif`;
+      tema.color.tokens[0].value = { light: "rgb(0 0 0 / 0.5)", dark: "#000000" };
+      expect(validarTema(tema).ok).toBe(true);
+    });
+  });
 });
 
 describe("tokensOpcionaisFaltando", () => {
