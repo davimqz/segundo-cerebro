@@ -39,10 +39,10 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
    - Pronto quando: os serviços conectam, cada um no seu banco, e um backup aparece no R2.
    - Spec: [001](specs/001-banco-e-backup.md). Arquivos em `infra/banco/`; passo a passo no playbook, capítulo "Banco e backup".
    - Andamento (2026-11-02): instalado no servidor. Conferidos: containers `healthy`, portas, isolamento dos bancos, `NOAUTH` no Redis, backup manual e pelo systemd no R2, restauração com contagens iguais, e-mail de falha do Healthchecks.io e acesso pelo DBeaver via túnel. Falta: o snapshot automático das 03:00 de 2026-11-03.
-3. **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
+3. [x] **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
    - Pronto quando: Davi entra no painel pelo subdomínio e troca entre claro e escuro.
    - Spec: [002](specs/002-painel-nucleo.md). Código em `painel/`, implantação em `infra/painel/`; passo a passo no playbook, capítulo "Painel".
-   - Andamento (2026-11-02): app pronto e testado localmente (unidade, integração com PostgreSQL e E2E com o container). Falta: implantar no servidor e criar a rota e o Access (passos 43 a 53 do playbook).
+   - Concluído em 2026-11-02: implantado no servidor (container `healthy`, porta só em `127.0.0.1:18000`), rota no tunnel e Access em `painel.asttralabs.com.br`. Os testes do passo 53 do playbook passaram no computador e no celular.
 4. **Temas, parte do MVP:** carregar um design system e trocar o tema ativo.
    - Pronto quando: um `tokens.json` carregado muda as cores do painel.
 5. **Paperclip:** instalado, com os 5 departamentos e a regra base de aprovação.
