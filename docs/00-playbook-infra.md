@@ -404,7 +404,7 @@ O código fica em `painel/` e a implantação em `infra/painel/` neste repositó
 
 O container escuta só em `127.0.0.1:18000`, roda as migrações do banco antes de abrir e responde em `/api/saude` para o healthcheck. O sistema de arquivos do container é só de leitura.
 
-### Instalação (a executar)
+### Instalação (executada em 2026-11-02)
 
 43. **Conferir que a porta está livre** (no servidor). Não deve aparecer nada.
 
@@ -539,6 +539,8 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | O build do painel para com "Killed" ou "JavaScript heap out of memory" | Faltou memória no servidor durante o `next build` | Rodar o build fora do horário de uso; se repetir, rever o ADR 0005 (gatilho "falta de memória") |
 | O painel fica `unhealthy` e o log mostra "Falha nas migrações" | O `DATABASE_URL` está errado ou o banco não está na rede `asttra` | Conferir o `.env` (passo 48) e o `sudo docker compose ps` em `/opt/asttra/banco` |
 | O login responde "Muitas tentativas" | Muitas tentativas do mesmo IP em 15 minutos | Esperar 15 minutos; se esqueceu a senha, trocar pelo servidor ("Trocar ou recuperar a senha do painel") |
+| O subdomínio do painel responde 502 | A rota do tunnel aponta para o lugar errado (tipo `HTTPS` em vez de `HTTP`, ou URL diferente de `localhost:18000`) | Corrigir a rota no tunnel `vps-asttra`; o cloudflared usa `network_mode: host`, então `localhost` é o servidor |
+| O Access protege o domínio inteiro em vez do subdomínio | O campo Subdomain ficou vazio em Destinations | Preencher Subdomain (`painel`) e conferir no Preview o destino `painel.asttralabs.com.br` antes de salvar |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
@@ -550,5 +552,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Atualizações de segurança automáticas
 - [x] Docker pelo repositório oficial
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
-- [ ] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53)
+- [x] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53 executados em 02/11/2026)
 - [ ] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; falta confirmar o primeiro backup automático das 03:00)
