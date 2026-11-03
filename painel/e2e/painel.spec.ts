@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 const EMAIL = process.env.E2E_EMAIL ?? "";
@@ -79,6 +80,50 @@ test("o aviso criado pelo script aparece e some ao resolver", async ({ page }) =
   await page.reload();
   await expect(page.getByTestId("atividade").filter({ hasText: "aviso_resolvido" }).first()).toBeVisible();
   await expect(page.getByTestId("atividade").filter({ hasText: "login" }).first()).toBeVisible();
+});
+
+test("carregar e ativar um tema muda o fundo do painel, e o Selecta volta no fim", async ({ page }) => {
+  const fixture = (nome: string) => path.join(__dirname, "fixtures", nome);
+  const fundo = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+  await entrar(page);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Visão geral");
+  await page.goto("/configuracoes");
+  const lista = page.getByRole("list", { name: "Temas instalados" });
+  const item = (nome: string) => lista.getByRole("listitem").filter({ hasText: nome });
+  await expect(item("Selecta")).toContainText("Ativo");
+  await expect(item("Selecta")).toContainText("Padrão");
+  const fundoSelecta = await fundo();
+
+  const envio = page.getByLabel("Carregar tema (tokens.json)");
+  await envio.setInputFiles(fixture("tema-invalido.json"));
+  await page.getByRole("button", { name: "Carregar tema", exact: true }).click();
+  await expect(page.locator("form").getByRole("alert")).toContainText("Falta o token de cor obrigatório: border");
+  await expect(item("Tema Inválido E2E")).toHaveCount(0);
+
+  await envio.setInputFiles(fixture("tema-teste.json"));
+  await page.getByRole("button", { name: "Carregar tema", exact: true }).click();
+  await expect(page.locator("form").getByRole("status").filter({ hasText: "Tema instalado" })).toBeVisible();
+  await expect(item("Teste E2E")).toBeVisible();
+  await expect(item("Teste E2E")).not.toContainText("Ativo");
+  expect(await fundo()).toBe(fundoSelecta);
+
+  await item("Teste E2E").getByRole("button", { name: "Ativar" }).click();
+  await expect(item("Teste E2E")).toContainText("Ativo");
+  await expect.poll(fundo).toBe("rgb(255, 247, 230)");
+  await page.reload();
+  expect(await fundo()).toBe("rgb(255, 247, 230)");
+  await page.goto("/");
+  expect(await fundo()).toBe("rgb(255, 247, 230)");
+
+  await page.goto("/atividades");
+  await expect(page.getByTestId("atividade").filter({ hasText: "tema_instalado" }).first()).toBeVisible();
+  await expect(page.getByTestId("atividade").filter({ hasText: "tema_ativado" }).first()).toBeVisible();
+
+  await page.goto("/configuracoes");
+  await item("Selecta").getByRole("button", { name: "Ativar" }).click();
+  await expect(item("Selecta")).toContainText("Ativo");
+  await expect.poll(fundo).toBe(fundoSelecta);
 });
 
 test("Sair volta para /entrar e a sessão deixa de valer", async ({ page }) => {

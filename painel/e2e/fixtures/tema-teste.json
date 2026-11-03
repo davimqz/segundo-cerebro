@@ -1,0 +1,268 @@
+{
+  "name": "Teste E2E",
+  "version": 1,
+  "color": {
+    "themes": [
+      {
+        "id": "light",
+        "name": "Claro"
+      },
+      {
+        "id": "dark",
+        "name": "Escuro"
+      }
+    ],
+    "tokens": [
+      {
+        "name": "surface",
+        "value": {
+          "light": "#fff7e6",
+          "dark": "#1a1406"
+        },
+        "usage": "Fundo das telas."
+      },
+      {
+        "name": "surface-subtle",
+        "value": {
+          "light": "#fdebc8",
+          "dark": "#2a2010"
+        },
+        "usage": "Barra lateral e linhas alternadas de tabela."
+      },
+      {
+        "name": "text",
+        "value": {
+          "light": "#3b2a00",
+          "dark": "#fff1d6"
+        },
+        "usage": "Texto principal e botão primário (19,8:1 e 19:1)."
+      },
+      {
+        "name": "text-muted",
+        "value": {
+          "light": "#737373",
+          "dark": "#a3a3a3"
+        },
+        "usage": "Texto secundário (4,7:1 e 7,8:1)."
+      },
+      {
+        "name": "title-muted",
+        "value": {
+          "light": "#a3a3a3",
+          "dark": "#737373"
+        },
+        "usage": "Segunda parte dos títulos de tela. Só em títulos, nunca como único portador de informação."
+      },
+      {
+        "name": "border",
+        "value": {
+          "light": "#e5e5e5",
+          "dark": "#262626"
+        },
+        "usage": "Linhas de 1px entre blocos."
+      },
+      {
+        "name": "border-strong",
+        "value": {
+          "light": "#d4d4d4",
+          "dark": "#404040"
+        },
+        "usage": "Bordas de campos e botões."
+      },
+      {
+        "name": "status-success",
+        "value": {
+          "light": "#15803d",
+          "dark": "#4ade80"
+        },
+        "usage": "Aprovado, concluído (5,0:1 e 11,4:1)."
+      },
+      {
+        "name": "status-warning",
+        "value": {
+          "light": "#a16207",
+          "dark": "#facc15"
+        },
+        "usage": "Pendente, perto do prazo, limite da IA (4,9:1 e 12,9:1)."
+      },
+      {
+        "name": "status-danger",
+        "value": {
+          "light": "#b91c1c",
+          "dark": "#f87171"
+        },
+        "usage": "Recusado, atrasado, erro (6,5:1 e 7,2:1)."
+      },
+      {
+        "name": "status-info",
+        "value": {
+          "light": "#1d4ed8",
+          "dark": "#60a5fa"
+        },
+        "usage": "Informativo, em andamento (6,7:1 e 7,8:1)."
+      },
+      {
+        "name": "tag-crescimento",
+        "value": {
+          "light": "#1d4ed8",
+          "dark": "#93c5fd"
+        },
+        "usage": "Departamento Crescimento (6,7:1 e 11:1)."
+      },
+      {
+        "name": "tag-entrega",
+        "value": {
+          "light": "#6d28d9",
+          "dark": "#c4b5fd"
+        },
+        "usage": "Departamento Entrega (7,1:1 e 10,7:1)."
+      },
+      {
+        "name": "tag-clientes",
+        "value": {
+          "light": "#0f766e",
+          "dark": "#5eead4"
+        },
+        "usage": "Departamento Clientes (5,5:1 e 13,4:1)."
+      },
+      {
+        "name": "tag-administracao",
+        "value": {
+          "light": "#b45309",
+          "dark": "#fcd34d"
+        },
+        "usage": "Departamento Administração (5:1 e 13,7:1)."
+      },
+      {
+        "name": "tag-direcao",
+        "value": {
+          "light": "#404040",
+          "dark": "#d4d4d4"
+        },
+        "usage": "Departamento Direção (10,4:1 e 13,4:1)."
+      }
+    ]
+  },
+  "type": {
+    "fonts": [],
+    "families": {
+      "sans": "\"Geist\", \"Inter\", system-ui, sans-serif",
+      "mono": "\"IBM Plex Mono\", ui-monospace, \"SF Mono\", monospace"
+    },
+    "groups": [
+      {
+        "name": "Painel",
+        "family": "sans",
+        "styles": [
+          {
+            "name": "page-title",
+            "fontSize": "24px",
+            "lineHeight": "1.2",
+            "fontWeight": 500,
+            "letterSpacing": "-0.03em",
+            "usage": "Título de cada tela, em duas partes."
+          },
+          {
+            "name": "section",
+            "fontSize": "16px",
+            "lineHeight": "1.3",
+            "fontWeight": 500,
+            "usage": "Títulos de bloco e de card."
+          },
+          {
+            "name": "body",
+            "fontSize": "14px",
+            "lineHeight": "1.45",
+            "fontWeight": 400,
+            "usage": "Texto e células de tabela."
+          },
+          {
+            "name": "small",
+            "fontSize": "13px",
+            "lineHeight": "1.4",
+            "fontWeight": 400,
+            "usage": "Datas, metadados, ajuda."
+          },
+          {
+            "name": "metric",
+            "fontSize": "28px",
+            "lineHeight": "1.1",
+            "fontWeight": 500,
+            "letterSpacing": "-0.02em",
+            "usage": "Valor dos indicadores, números tabulares."
+          }
+        ]
+      },
+      {
+        "name": "Mono",
+        "family": "mono",
+        "styles": [
+          {
+            "name": "label",
+            "fontSize": "11px",
+            "lineHeight": "1",
+            "fontWeight": 500,
+            "letterSpacing": "0.12em",
+            "usage": "Tags, cabeçalhos de tabela e rótulos curtos. Sempre em caixa alta."
+          }
+        ]
+      }
+    ]
+  },
+  "spacing": {
+    "tokens": [
+      {
+        "name": "space-1",
+        "value": "4px"
+      },
+      {
+        "name": "space-2",
+        "value": "8px"
+      },
+      {
+        "name": "space-3",
+        "value": "12px"
+      },
+      {
+        "name": "space-4",
+        "value": "16px"
+      },
+      {
+        "name": "space-5",
+        "value": "24px"
+      },
+      {
+        "name": "space-6",
+        "value": "32px"
+      },
+      {
+        "name": "space-7",
+        "value": "48px",
+        "usage": "Só entre seções grandes."
+      }
+    ]
+  },
+  "radius": {
+    "tokens": [
+      {
+        "name": "radius-none",
+        "value": "0",
+        "usage": "Cards, painéis e tabelas."
+      },
+      {
+        "name": "radius-xs",
+        "value": "2px",
+        "usage": "Botões, campos e tags."
+      }
+    ]
+  },
+  "shadow": {
+    "tokens": [
+      {
+        "name": "shadow-overlay",
+        "value": "0 8px 24px rgba(0, 0, 0, 0.16)",
+        "usage": "Só menus suspensos e janelas sobrepostas."
+      }
+    ]
+  }
+}
