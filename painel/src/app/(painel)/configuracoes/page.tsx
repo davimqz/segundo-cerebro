@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import { CabecalhoDaTela } from "@/components/cabecalho-da-tela";
 import { exigirSessao } from "@/core/auth/sessao";
 import { COOKIE_MODO, lerModo } from "@/core/modo/modo";
-import { temaAtivo } from "@/core/temas/servico";
+import { listarTemas } from "@/core/temas/servico";
 import { BotaoSair, FormTrocarSenha, SeletorDeModo } from "./conta";
+import { FormCarregarTema, ListaDeTemas } from "./temas";
 
 export const metadata = { title: "Configurações" };
 
@@ -23,7 +24,7 @@ function Secao({ id, titulo, children }: { id: string; titulo: string; children:
 
 export default async function Configuracoes() {
   const usuario = await exigirSessao();
-  const [loja, ativo] = await Promise.all([cookies(), temaAtivo()]);
+  const [loja, temas] = await Promise.all([cookies(), listarTemas()]);
   const modo = lerModo(loja.get(COOKIE_MODO)?.value);
 
   return (
@@ -31,13 +32,12 @@ export default async function Configuracoes() {
       <CabecalhoDaTela titulo="Configurações" complemento="do painel" />
 
       <Secao id="aparencia" titulo="Aparência">
-        <div className="flex flex-col gap-1">
-          <span className="rotulo text-text-muted">Tema ativo</span>
-          <span data-testid="tema-ativo">{ativo.nome}</span>
-          <span className="text-[13px] text-text-muted">Carregar e trocar temas chega na Etapa 1, item 4.</span>
+        <ListaDeTemas temas={temas} />
+        <FormCarregarTema />
+        <div className="flex flex-col gap-5 border-t border-border pt-5">
+          <SeletorDeModo inicial={modo} />
+          <p className="m-0 text-[13px] text-text-muted">A escolha vale só neste aparelho.</p>
         </div>
-        <SeletorDeModo inicial={modo} />
-        <p className="m-0 text-[13px] text-text-muted">A escolha vale só neste aparelho.</p>
       </Secao>
 
       <Secao id="conta" titulo="Conta">

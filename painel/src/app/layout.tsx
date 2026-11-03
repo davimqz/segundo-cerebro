@@ -24,7 +24,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" data-modo={modo} className={`${geist.variable} ${plexMono.variable}`}>
       <head>
-        {/* Seguro: o schema do tema recusa valores com < > { } ; ou barra invertida. */}
+        {/* Seguro: o schema do tema recusa valores com < > { } ; barra invertida, url(, @ ou expression(. */}
         <style id="tema" dangerouslySetInnerHTML={{ __html: temaParaCss(tema) }} />
       </head>
       <body className="min-h-dvh bg-surface text-text">{children}</body>
