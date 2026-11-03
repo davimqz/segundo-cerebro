@@ -5,6 +5,8 @@
 # Uso: bash scripts/check.sh            (ShellCheck, painel e, se houver docker e restic, os testes de integração)
 #      CHECK_INTEGRACAO=1 bash scripts/check.sh   (exige os testes de integração; usado no CI)
 # O E2E do painel fica fora, para a checagem continuar rápida: bash scripts/teste-e2e.sh
+# O teste do Paperclip também fica fora (baixa uma imagem de ~2,5 GB): bash scripts/teste-paperclip.sh
+# (no CI ele roda pelo workflow paperclip.yml quando infra/paperclip muda).
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

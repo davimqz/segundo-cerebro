@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Teste de integração de infra/banco: sobe o compose com senhas de teste, confere o isolamento
 # dos bancos e a senha do Redis, roda backup.sh num repositório restic local (sem R2 e sem
-# Healthchecks.io), roda restaurar.sh e confere que uma falha termina com erro e limpa os dumps.
+# Healthchecks.io), com uma pasta de dados do Paperclip de teste (master.key falsa), roda
+# restaurar.sh e confere que uma falha termina com erro e limpa os dumps.
 #
 # Precisa de: docker (com compose), restic e a porta 127.0.0.1:5432 livre.
 # Uso: bash scripts/teste-banco.sh
@@ -107,16 +108,34 @@ echo "   ok"
 echo "== backup.sh num repositório restic local"
 export RESTIC_REPOSITORY="$TMP/restic" RESTIC_PASSWORD="senha-de-teste" HC_PING_URL=""
 export BACKUP_ENV="$TMP/sem-arquivo.env"
+# Pasta de dados do Paperclip de teste, com uma master.key falsa.
+export PAPERCLIP_DADOS="$TMP/paperclip-dados"
+mkdir -p "$PAPERCLIP_DADOS/instances/default/secrets"
+head -c 32 /dev/urandom >"$PAPERCLIP_DADOS/instances/default/secrets/master.key"
 restic init --quiet >/dev/null
 bash "$TMP/banco/backup/backup.sh"
-[[ "$(restic snapshots --json | grep -o '"short_id"' | wc -l)" -eq 1 ]] ||
-  falhar "deveria haver 1 snapshot"
-restic ls latest | grep -q 'painel.dump' || falhar "snapshot sem painel.dump"
-restic ls latest | grep -q 'globals.sql' || falhar "snapshot sem globals.sql"
+# A saída do restic vai para uma variável antes do grep: com pipefail, um grep -q que fecha o pipe
+# cedo faria o pipeline falhar por SIGPIPE.
+snapshots() {
+  local json
+  json="$(restic snapshots --host asttra-banco --tag "$1" --json)"
+  grep -o '"short_id"' <<<"$json" | wc -l || true
+}
+tem_no_snapshot() {
+  local lista
+  lista="$(restic ls latest --tag "$1")"
+  grep -q "$2" <<<"$lista"
+}
+[[ "$(snapshots banco)" -eq 1 ]] || falhar "deveria haver 1 snapshot com a tag banco"
+[[ "$(snapshots paperclip)" -eq 1 ]] || falhar "deveria haver 1 snapshot com a tag paperclip"
+tem_no_snapshot banco 'painel.dump' || falhar "snapshot sem painel.dump"
+tem_no_snapshot banco 'globals.sql' || falhar "snapshot sem globals.sql"
+tem_no_snapshot paperclip '/secrets/master\.key$' || falhar "snapshot paperclip sem a master.key"
 
 echo "== restaurar.sh"
 bash "$TMP/banco/backup/restaurar.sh" | tee "$TMP/restauracao.log"
 grep -q "contagens iguais em todos os bancos" "$TMP/restauracao.log" || falhar "restauração sem contagens iguais"
+grep -q "contém a master.key" "$TMP/restauracao.log" || falhar "restaurar.sh não conferiu a master.key"
 dc exec -T postgres psql -U postgres -d postgres -Atc \
   "SELECT count(*) FROM pg_database WHERE datname = 'restauracao_teste'" | grep -qx 0 ||
   falhar "restauracao_teste deveria ter sido apagado"
@@ -131,10 +150,35 @@ for dias in $(seq 1 30); do
     "$TMP/antigo-$dias" >/dev/null
 done
 bash "$TMP/banco/backup/backup.sh" >/dev/null
-total="$(restic snapshots --json | grep -o '"short_id"' | wc -l)"
+total="$(snapshots banco)"
 # 7 dias seguidos + até 4 semanas (algumas coincidem com os dias): entre 7 e 11.
 [[ "$total" -ge 7 && "$total" -le 11 ]] || falhar "retenção deixou $total snapshots (esperado 7 a 11)"
-echo "   ok ($total snapshots)"
+# A retenção de uma tag não apaga a outra: os 2 da pasta do Paperclip (mesmo dia) continuam, porque
+# com menos de 7 dias de cópias o restic guarda também a mais antiga ("oldest daily snapshot").
+PAPERCLIP_SNAPS="$(snapshots paperclip)"
+[[ "$PAPERCLIP_SNAPS" -ge 1 && "$PAPERCLIP_SNAPS" -le 2 ]] ||
+  falhar "a retenção deixou $PAPERCLIP_SNAPS snapshots com a tag paperclip (esperado 1 ou 2)"
+echo "   ok ($total snapshots do banco)"
+
+echo "== Servidor sem Paperclip: backup segue só com o banco"
+PAPERCLIP_DADOS="$TMP/nao-existe" bash "$TMP/banco/backup/backup.sh" >"$TMP/sem-paperclip.log"
+grep -q "pasta de dados do Paperclip não existe" "$TMP/sem-paperclip.log" || falhar "backup.sh não avisou que pulou a pasta"
+[[ "$(snapshots paperclip)" -eq "$PAPERCLIP_SNAPS" ]] || falhar "backup sem a pasta não deveria criar snapshot paperclip"
+# restaurar.sh num repositório que nunca teve a tag paperclip.
+REPO_PRINCIPAL="$RESTIC_REPOSITORY"
+export RESTIC_REPOSITORY="$TMP/restic-sem-paperclip"
+restic init --quiet >/dev/null
+PAPERCLIP_DADOS="$TMP/nao-existe" bash "$TMP/banco/backup/backup.sh" >/dev/null
+PAPERCLIP_DADOS="$TMP/nao-existe" bash "$TMP/banco/backup/restaurar.sh" >"$TMP/restaura-sem-paperclip.log" ||
+  { cat "$TMP/restaura-sem-paperclip.log" >&2; falhar "restaurar.sh sem Paperclip deveria terminar com sucesso"; }
+grep -q "Sem Paperclip neste servidor: pulada" "$TMP/restaura-sem-paperclip.log" ||
+  falhar "restaurar.sh não avisou que pulou a pasta do Paperclip"
+# Com a pasta existindo e nenhum snapshot dela, restaurar.sh deve acusar.
+if bash "$TMP/banco/backup/restaurar.sh" >/dev/null 2>&1; then
+  falhar "restaurar.sh deveria falhar com a pasta do Paperclip sem snapshot"
+fi
+export RESTIC_REPOSITORY="$REPO_PRINCIPAL"
+echo "   ok"
 
 echo "== Falha: backup com o PostgreSQL parado"
 dc stop postgres >/dev/null

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Backup diário do PostgreSQL para o Cloudflare R2, com restic.
+# Backup diário do PostgreSQL e da pasta de dados do Paperclip para o Cloudflare R2, com restic.
 # Roda pelo timer do systemd (asttra-backup.timer) ou à mão: sudo /opt/asttra/banco/backup/backup.sh
 #
-# Passos: avisa o início ao Healthchecks.io, gera os dumps, envia ao restic, aplica a retenção
-# e avisa sucesso ou falha. Os dumps temporários são apagados em qualquer caso.
+# Passos: avisa o início ao Healthchecks.io, gera os dumps, envia ao restic os dumps (tag banco) e
+# a pasta de dados do Paperclip com a master.key (tag paperclip), aplica a retenção e avisa sucesso
+# ou falha. Os dumps temporários são apagados em qualquer caso.
 #
 # Variáveis (de backup.env, ver backup.env.example):
 #   RESTIC_REPOSITORY, RESTIC_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HC_PING_URL
@@ -11,6 +12,8 @@
 #   BACKUP_ENV  arquivo de variáveis (padrão: backup.env ao lado deste script)
 #   BANCO_DIR   pasta do compose.yml (padrão: a pasta acima deste script)
 #   HC_PING_URL vazia desliga os avisos (usado no teste de integração)
+#   PAPERCLIP_DADOS pasta de dados do Paperclip (padrão: /opt/asttra/paperclip/dados). Se ela não
+#               existir (servidor sem Paperclip), o backup segue só com o banco.
 set -euo pipefail
 
 DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,6 +30,7 @@ fi
 : "${RESTIC_REPOSITORY:?defina RESTIC_REPOSITORY no backup.env}"
 : "${RESTIC_PASSWORD:?defina RESTIC_PASSWORD no backup.env}"
 HC_PING_URL="${HC_PING_URL:-}"
+PAPERCLIP_DADOS="${PAPERCLIP_DADOS:-/opt/asttra/paperclip/dados}"
 
 # Avisa o Healthchecks.io. Uma falha no aviso não derruba o backup.
 avisar() {
@@ -79,10 +83,17 @@ for banco in "${bancos[@]}"; do
 done
 
 echo "3/4 Enviando ao restic e aplicando a retenção."
-# --host fixo, para o nome da máquina não importar. A retenção agrupa por host e tag, e não
-# pelo caminho (o padrão do restic), porque o diretório temporário muda a cada execução.
+# --host fixo, para o nome da máquina não importar.
 (cd "$TMP" && restic backup --host asttra-banco --tag banco dumps)
-restic forget --host asttra-banco --tag banco --group-by host,tags \
+if [[ -d "$PAPERCLIP_DADOS" ]]; then
+  echo "   - pasta de dados do Paperclip ($PAPERCLIP_DADOS)"
+  restic backup --host asttra-banco --tag paperclip "$PAPERCLIP_DADOS"
+else
+  echo "   - pasta de dados do Paperclip não existe ($PAPERCLIP_DADOS): pulada."
+fi
+# A retenção agrupa por host e tag, e não pelo caminho (o padrão do restic), porque o diretório
+# temporário muda a cada execução. Cada tag (banco e paperclip) guarda 7 diárias e 4 semanais.
+restic forget --host asttra-banco --group-by host,tags \
   --keep-daily 7 --keep-weekly 4 --prune
 
 echo "4/4 Avisando o resultado."

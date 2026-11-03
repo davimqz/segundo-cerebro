@@ -1,0 +1,30 @@
+name: Paperclip
+
+# Baixar a imagem oficial do Paperclip (~2,5 GB) e montar a final leva vários minutos. Por isso
+# este teste roda só quando muda a infra do Paperclip ou o próprio teste (spec 004).
+on:
+  pull_request:
+    paths:
+      - "infra/paperclip/**"
+      - "infra/banco/**"
+      - "scripts/teste-paperclip.sh"
+      - ".github/workflows/paperclip.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/paperclip/**"
+      - "scripts/teste-paperclip.sh"
+      - ".github/workflows/paperclip.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integracao:
+    name: Integração do Paperclip
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: scripts/teste-paperclip.sh
+        run: bash scripts/teste-paperclip.sh
