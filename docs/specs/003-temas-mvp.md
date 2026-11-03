@@ -2,7 +2,7 @@
 
 - Risco: R1
 - Origem: Build Plan, Etapa 1, item 4; App Flow, "Aparência: editar e carregar temas" (passos 1, 2 e 5); Design Brief, "Temas editáveis no painel"
-- Status: Rascunho
+- Status: Implementada (2026-11-03, PR #21); falta a verificação no servidor (passo 6 do plano)
 
 ## Objetivo
 Em Configurações › Aparência, Davi vê os temas instalados, carrega um design system no formato `tokens.json` do Selecta e escolhe qual tema fica ativo. É isso que permite trocar a identidade do painel (inclusive para um cliente) sem mexer no código. O núcleo já tem a tabela `temas`, a validação (`core/temas/schema.ts`), a geração do CSS (`core/temas/css.ts`) e a leitura do tema ativo (`core/temas/servico.ts`). Falta a parte de carregar e trocar pela tela.

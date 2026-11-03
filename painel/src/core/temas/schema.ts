@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Formato do tokens.json do design system Selecta (conferido em 2026-11-02).
-// O painel aceita exatamente esse formato; o item 4 vai carregar arquivos nele.
+// O painel aceita exatamente esse formato; é o que Configurações › Aparência carrega.
 // Campos que o painel não usa (sample, usage, fonts...) são aceitos e mantidos.
 
 /** Modos que o painel exige em todo tema. */
