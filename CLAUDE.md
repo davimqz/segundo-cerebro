@@ -51,7 +51,12 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
 - **Backup:** diário às 03:00 com restic no bucket `asttra-backups` do Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com alerta pelo Healthchecks.io e teste de restauração mensal manual ([ADR 0003](docs/adr/0003-backup-com-restic-e-healthchecks.md)). Arquivos em `infra/banco/backup/`; instalado no servidor em 2026-11-02 (bucket `asttra-backups`, token `asttra-backups-restic`); primeiro backup automático confirmado em 2026-11-03.
 - **Banco:** PostgreSQL 18 e Redis 8 em `/opt/asttra/banco/` (cópia de `infra/banco/`), na rede Docker `asttra`. PostgreSQL só em `127.0.0.1:5432`; Redis sem porta publicada.
 - **Painel:** no ar em `painel.asttralabs.com.br` desde 2026-11-02 (Access com a policy `Só Davi`, sessão de 1 mês). Container em `/opt/asttra/painel/`, código em `/opt/asttra/painel-src/`, porta só em `127.0.0.1:18000`.
-- **Subdomínios propostos:** `agentes.` (Paperclip) e `automacoes.` (n8n).
+- **Paperclip:** no ar em `agentes.asttralabs.com.br` desde 2026-11-03.
+  - Access com a policy `Só Davi`, e depois o login próprio do Paperclip.
+  - Container em `/opt/asttra/paperclip/`, a partir da imagem oficial fixada por digest e sem as CLIs (ADR 0006). Porta só em `127.0.0.1:18100`.
+  - Dados e `master.key` em `dados/`, no backup diário com a tag `paperclip`.
+  - Empresa "Asttra Labs" com o prefixo `AST`.
+- **Subdomínio proposto:** `automacoes.` (n8n).
 - O IP do servidor não fica neste repositório. Peça ao Davi ou use o alias do `~/.ssh/config`.
 
 ## Stack decidida
@@ -134,4 +139,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 5 (Paperclip): classificar o risco e gerar a spec com `/asttra:feature`. Os itens 1 a 4 da Etapa 1 estão concluídos (temas carregados e ativados pela tela desde 2026-11-03, spec 003).
+1. Etapa 1, item 6 (Hermes no Telegram): classificar o risco e gerar a spec com `/asttra:feature`. Os itens 1 a 5 da Etapa 1 estão concluídos. O Paperclip está no ar desde 2026-11-03 (spec 004) e ainda não tem agentes: o Hermes será o primeiro.

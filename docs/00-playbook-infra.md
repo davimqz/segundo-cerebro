@@ -517,7 +517,7 @@ Os scripts de `infra/paperclip/` que mexem na configuração não usam senha nem
 
 **Antes de começar:** o PR da spec 004 precisa estar na `main`. Os arquivos saem de `/opt/asttra/painel-src`.
 
-### Instalação
+### Instalação (executada em 2026-11-03)
 
 54. **Conferir que a porta está livre e instalar o `jq`** (no servidor). O `ss` não deve mostrar nada. O `jq` lê as respostas da API nos scripts.
 
@@ -696,6 +696,10 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | `configurar.sh` dá "jq não encontrado" | Falta o `jq` no servidor | `sudo apt-get install -y jq` (passo 54) |
 | O link de aprovação do script mostra a tela de login | O navegador não está logado no Paperclip | Entrar no Paperclip e abrir o link de novo (vale 10 minutos) |
 | `configurar.sh` dá "Instance admin required" | A conta que aprovou o link não é a admin do passo 63 | Aprovar com a conta do Davi |
+| Depois do convite, o Paperclip abre um assistente que pede o nome da organização e o "primeiro agente", sem opção de pular | É o onboarding do Paperclip; a empresa ainda não tem agentes | Não crie o agente (a spec 004 proíbe). Se a empresa já foi criada pelo assistente com o nome do `configuracao.env`, o `configurar.sh` a reaproveita. Feche a aba e siga para o passo 64 |
+| O link da aprovação sempre cai no assistente de "primeiro agente" | O assistente aparece enquanto a empresa não tem agentes | Abra o pedido direto: `https://agentes.asttralabs.com.br/AST/approvals/<id>` (`AST` é o prefixo da empresa; confira com `SELECT issue_prefix FROM companies` no banco `paperclip`) |
+| Um comando com `\| tail` parece travado | O `tail` só mostra a saída quando o comando termina | Esperar, ou rodar sem o `\| tail` para ver o progresso. Se der Ctrl+C no backup, conferir se ficou trava: `restic list locks` (como no passo 38) |
+| Ao colar um bloco grande no terminal, uma linha sai cortada | O terminal perdeu parte da colagem | Conferir com `sudo grep` as linhas que não são segredo e corrigir com `sed -i` |
 | `convite-admin.sh` dá "permission denied" no `.env` | O script chama o `docker compose` do banco, que lê o `.env` do root | Rodar com `sudo` |
 | `docker compose build` dá "manifest unknown" ou "not found" | `PAPERCLIP_IMAGEM` com versão ou digest errado | Conferir com `docker buildx imagetools inspect` (ver "Trocar a versão do Paperclip") |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
@@ -710,4 +714,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Docker pelo repositório oficial
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
 - [x] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53 executados em 02/11/2026)
+- [x] Paperclip no ar em `agentes.asttralabs.com.br` (Etapa 1, item 5: passos 54 a 67 executados em 03/11/2026)
 - [x] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; primeiro backup automático das 03:00 confirmado em 03/11/2026)

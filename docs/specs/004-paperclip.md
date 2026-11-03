@@ -2,7 +2,7 @@
 
 - Risco: R2
 - Origem: Build Plan, Etapa 1, item 5; PRD, RF02 e RF03 e "Fase 1 – MVP"; TRD, "Componentes", "Rede", "Dados" e "Riscos técnicos"; App Flow, "Fluxo de aprovação"
-- Status: Em implementação
+- Status: Concluída (2026-11-03)
 
 ## Objetivo
 O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PRD, RF02 e RF03). Este item instala o Paperclip no servidor, em `agentes.asttralabs.com.br`. Ele usa o banco `paperclip`, que já existe, e tem a empresa, os 5 departamentos e a regra base de aprovação configurados. O Hermes só entra no item 6. Aqui basta provar que um pedido de aprovação criado pela API aparece na tela e pode ser aprovado.
