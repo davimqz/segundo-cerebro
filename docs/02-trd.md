@@ -56,7 +56,7 @@ Nenhum serviço é acessado diretamente pela internet: todo acesso web passa pel
 
 - **Cloudflare Tunnel:** o container `cloudflared` abre uma conexão de saída até a Cloudflare. Nenhuma porta web é aberta no firewall.
 - **Cloudflare Access:** cada serviço web (painel, Paperclip, n8n) fica atrás de uma tela de login da Cloudflare, liberada só para o e-mail de Davi. O plano gratuito cobre até 50 usuários, com retenção de logs de 24 horas ([Costbench](https://costbench.com/software/business-vpn/cloudflare-zero-trust/free-plan/)).
-- **Subdomínios propostos:** `painel.asttralabs.com.br`, `agentes.asttralabs.com.br` (Paperclip) e `automacoes.asttralabs.com.br` (n8n), todos com proxy da Cloudflare ligado.
+- **Subdomínios:** `painel.asttralabs.com.br` e `agentes.asttralabs.com.br` (Paperclip), no ar. `automacoes.asttralabs.com.br` (n8n) ainda é proposto. Todos com o proxy da Cloudflare ligado.
 - **Containers:** portas publicadas só em `127.0.0.1`, porque o Docker ignora o UFW. Os serviços conversam entre si por uma rede Docker interna.
 - **Hermes isolado:** comandos executados pelo agente rodam em container separado (`terminal.backend docker`), com modo de aprovação ligado (`approval_mode ask`). O gateway do Telegram só faz conexões de saída.
 - **Segredos:** chaves de API, tokens e senhas ficam em arquivos `.env` fora do Git, com permissão restrita ao usuário do serviço. Nunca entram na base de conhecimento nem nas mensagens.

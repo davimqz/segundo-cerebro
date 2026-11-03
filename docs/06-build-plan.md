@@ -47,8 +47,17 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
    - Pronto quando: um `tokens.json` carregado muda as cores do painel.
    - Spec: [003](specs/003-temas-mvp.md). PRs #21 e #22.
    - Concluído em 2026-11-03: implantado no servidor e conferido por Davi em `painel.asttralabs.com.br` (lista com o Selecta ativo e padrão, tema carregado entra inativo, "Ativar" muda o fundo em todas as telas e depois de recarregar, `tema_instalado` e `tema_ativado` em Atividades, volta ao Selecta).
-5. **Paperclip:** instalado, com os 5 departamentos e a regra base de aprovação.
+5. [x] **Paperclip:** instalado, com os 5 departamentos e a regra base de aprovação.
    - Pronto quando: um pedido de aprovação de teste aparece e pode ser aprovado.
+   - Spec: [004](specs/004-paperclip.md). ADR [0006](adr/0006-paperclip-da-imagem-oficial-com-postgresql-externo.md). PRs #24, #25 e #26. Implantação em `infra/paperclip/`; passo a passo no playbook, capítulo "Paperclip".
+   - Concluído em 2026-11-03. O que foi conferido:
+     - container `healthy`, com a porta só em `127.0.0.1:18100`;
+     - 330 migrações aplicadas no PostgreSQL 18;
+     - Access com a policy `Só Davi` em `agentes.asttralabs.com.br`;
+     - empresa "Asttra Labs" com os 5 projetos, a trava de contratação, o orçamento 0 e a regra escrita;
+     - backup com a tag `paperclip` e restauração que confirma a `master.key`;
+     - pedido `request_board_approval` de teste aprovado pela tela, com a chave temporária revogada;
+     - dados mantidos depois de recriar o container.
 6. **Hermes no Telegram:** com modelos gratuitos, execução isolada e ligado ao Paperclip.
    - Pronto quando: Davi pede uma tarefa no Telegram, ela aparece no Paperclip e a aprovação volta pelo Telegram.
 7. **Ponte do Hermes com o painel (servidor MCP):** o Hermes consulta e age no painel, registrando tudo em Atividades.
@@ -88,6 +97,14 @@ Ideias registradas, só quando Davi pedir: resumo diário, revisão semanal e fo
 Ideias de infraestrutura (da spec 001):
 - **Bucket Lock no R2:** impedir que os backups sejam apagados antes do prazo, mesmo com a chave do R2 vazada.
 - **Mover o Cloudflare Tunnel** de `~/infra/cloudflared` para `/opt/asttra/`, junto com os outros serviços.
+
+Ideias do Paperclip (da spec 004), para Davi decidir:
+- **Backup interno do Paperclip:** ele copia o próprio banco a cada hora para a pasta de dados, e isso também entra no restic. Pode ser desligado com `PAPERCLIP_DB_BACKUP_ENABLED=false`.
+- **Fechar o cadastro:** usar `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` agora que o admin existe. Hoje só o Access impede novas contas.
+- **Sugestões do revisor (PR #26):**
+  - `COPY --chown=root:root` no Dockerfile;
+  - base `node` fixada por digest e `cap_drop: [ALL]`;
+  - URL do desafio passada por `--config -` no `lib.sh`.
 
 ## Perguntas em aberto
 
