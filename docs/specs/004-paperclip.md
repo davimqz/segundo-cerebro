@@ -15,6 +15,7 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 - A imagem é construída no servidor a partir de uma versão fixa, como no ADR 0005.
 - O teste é feito pela API, com `curl`.
 - A regra base tem três partes: a trava de contratação, o orçamento zero e a regra escrita.
+- A pasta de dados do Paperclip, com a `master.key`, entra no backup diário.
 
 ## Critérios de aceite
 **Instalação e rede**
@@ -26,6 +27,12 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 **Banco**
 - Quando o Paperclip inicia apontando para o banco `paperclip` (usuário `paperclip`), as migrações dele devem rodar sem erro no PostgreSQL 18. Ele não deve usar o banco embutido nem ter acesso aos bancos `painel` e `n8n`.
 - Se as migrações falharem no PostgreSQL 18, a implantação para e volta para o Davi decidir. Não se troca para o banco embutido nem para outra versão sem aprovação.
+
+**Backup** (confirmado pelo Davi em 2026-11-03)
+- Quando o backup diário roda, ele deve copiar também a pasta `/opt/asttra/paperclip/dados`, com a `master.key`, para o restic no R2. A cópia usa a tag `paperclip` e a mesma retenção do banco (7 cópias diárias e 4 semanais). O banco `paperclip` já entra pelos dumps que existem hoje.
+- Quando a pasta de dados não existe (num servidor sem Paperclip), o backup deve seguir só com o banco, sem falhar, e registrar no log que pulou a pasta.
+- Quando o `restaurar.sh` roda, ele deve conferir que o snapshot da pasta de dados existe e contém a `master.key`, sem sobrescrever a pasta em uso.
+- A `master.key` só sai do servidor cifrada pelo restic. Ela nunca vai para o Git, para docs ou para logs.
 
 **Empresa e departamentos**
 - Quando a configuração termina, deve existir uma empresa com o nome vindo do `.env` de configuração (na Asttra, "Asttra Labs"). Ela deve ter 5 projetos: Crescimento, Entrega, Clientes, Administração e Direção. Os nomes saem da tabela `departamentos` do painel, para a estrutura poder ser replicada, e nada fica fixo no código.
@@ -58,14 +65,15 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 - `infra/paperclip/configurar.sh` (novo, idempotente, ou seja, rodar de novo não duplica nada): cria a empresa, os 5 projetos (lidos da tabela `departamentos` pela API do painel ou de uma lista no `.env`), liga a trava de contratação, zera o orçamento e grava a regra escrita. Usa a API do Paperclip com a chave de board passada por variável de ambiente.
 - `infra/paperclip/teste-aprovacao.sh` (novo): cria o pedido de teste, espera o Davi aprovar na tela (consulta o status a cada poucos segundos, com tempo-limite) e imprime o resultado.
 - `infra/paperclip/regra-de-aprovacao.md` (novo): o texto da regra base.
-- `infra/banco/backup/backup.sh`: **proposta, a confirmar** (ver "Perguntas em aberto"). Incluir `/opt/asttra/paperclip/dados` no restic, com a tag `paperclip`, e a mesma retenção.
+- `infra/banco/backup/backup.sh`: incluir `/opt/asttra/paperclip/dados` no restic, com `--host asttra-banco --tag paperclip`, e um `restic forget` com a mesma retenção. O caminho vem de uma variável (`PAPERCLIP_DADOS`, com esse padrão) no `backup.env`, para a estrutura poder ser replicada.
+- `infra/banco/backup/backup.env.example`: nova variável `PAPERCLIP_DADOS`.
+- `infra/banco/backup/restaurar.sh`: conferir o snapshot da pasta de dados (`restic ls` com a tag `paperclip`, procurando a `master.key`).
 - `scripts/check.sh`: o ShellCheck passa a cobrir os scripts novos.
 - `docs/00-playbook-infra.md`: novo capítulo "Paperclip" com o passo a passo, cada comando dizendo onde roda, e uma tabela de erros comuns.
 - `docs/adr/0006-paperclip-construido-no-servidor-com-postgresql-externo.md` (proposto): por que construir de uma tag fixa e usar o PostgreSQL 18 compartilhado em vez do banco embutido.
 - Cloudflare (feito à mão, registrado no playbook): rota `agentes.asttralabs.com.br` → `http://localhost:18100` no tunnel `vps-asttra` e aplicação no Access com a policy `Só Davi`.
 
 ## Perguntas em aberto
-- **Backup da pasta de dados:** sem a `master.key`, os segredos guardados no Paperclip ficam ilegíveis numa restauração. A proposta é incluir `/opt/asttra/paperclip/dados` no backup diário. Isso não foi pedido; confirmar antes de implementar.
 - **PostgreSQL 18:** a documentação só mostra a versão 17. Isso só se descobre na implantação (ver o critério do banco).
 - **Orçamento zero e modelos gratuitos:** é preciso confirmar na implantação se o orçamento zero bloqueia também os modelos gratuitos.
 - **Primeiro login:** a documentação descreve o `paperclipai auth bootstrap-ceo` e o "primeiro login vira admin" no modo privado, mas não explica como fazer isso dentro do Docker. Testar o caminho e registrar no playbook.
@@ -75,7 +83,7 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 1. **ADR 0006:** registrar a decisão da instalação e do banco (`/asttra:adr`), com a aprovação do Davi.
 2. **Compose e `.env.example`:** escrever `infra/paperclip/`. Testar no Windows com Docker, contra um PostgreSQL 18 descartável: build, migrações, `healthy` e a porta só em `127.0.0.1`.
 3. **Scripts:** `configurar.sh`, `teste-aprovacao.sh` e `regra-de-aprovacao.md`. Rodar localmente duas vezes seguidas para provar que não duplicam nada.
-4. **Backup** (se o Davi confirmar): incluir a pasta de dados no `backup.sh` e no teste do banco.
+4. **Backup:** incluir a pasta de dados no `backup.sh`, no `backup.env.example`, no `restaurar.sh` e no teste do banco. No servidor, adicionar `PAPERCLIP_DADOS` ao `backup.env`, rodar um backup manual e conferir o snapshot com a tag `paperclip` no R2.
 5. **Playbook:** capítulo "Paperclip". Um bloco de comando por vez, dizendo onde rodar (Windows/PowerShell, servidor ou navegador).
 6. **Implantação no servidor**, guiada pelo playbook:
    - clonar a tag, construir, criar o `.env` com `chmod 600` e subir;
@@ -89,6 +97,7 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
   - confere as migrações e o `/api/health`;
   - roda o `configurar.sh` duas vezes e confere 1 empresa, 5 projetos, a trava de contratação ligada e o orçamento zero;
   - cria um `request_board_approval`, aprova pela API e confere o `approved`.
+- Integração do backup: o `scripts/teste-banco.sh` passa a criar uma pasta de dados de teste com uma `master.key` falsa. Ele confere que o snapshot com a tag `paperclip` existe e contém o arquivo, e que o backup sem a pasta não falha.
 - E2E: não se aplica no CI. A aprovação pela tela é a verificação manual abaixo.
 
 **Comandos de verificação:**
@@ -102,3 +111,4 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 3. No servidor, rodar `infra/paperclip/teste-aprovacao.sh`. O pedido de teste deve aparecer em "Approvals" como pendente.
 4. Clicar em "Aprovar" na tela. O script deve imprimir `approved` e terminar revogando a chave temporária.
 5. Recriar o container (`docker compose up -d --force-recreate`). A empresa, os projetos e o pedido aprovado devem continuar lá.
+6. No servidor, rodar `sudo /opt/asttra/banco/backup/backup.sh` e depois `restic snapshots --tag paperclip`. Deve aparecer um snapshot novo, e o `restaurar.sh` deve confirmar a `master.key` dentro dele.
