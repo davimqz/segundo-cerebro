@@ -553,4 +553,4 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Docker pelo repositório oficial
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
 - [x] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53 executados em 02/11/2026)
-- [ ] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; falta confirmar o primeiro backup automático das 03:00)
+- [x] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; primeiro backup automático das 03:00 confirmado em 03/11/2026)

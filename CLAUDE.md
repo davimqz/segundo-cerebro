@@ -48,7 +48,7 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
   - O site fica na Vercel e o e-mail na Hostinger.
   - Os registros existentes ficam em "DNS only". Não mexa neles.
 - **Cloudflare:** Tunnel `vps-asttra` rodando em Docker e Access com código por e-mail, lembrando o aparelho por 30 dias. Testado em `teste.asttralabs.com.br`.
-- **Backup:** diário às 03:00 com restic no bucket `asttra-backups` do Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com alerta pelo Healthchecks.io e teste de restauração mensal manual ([ADR 0003](docs/adr/0003-backup-com-restic-e-healthchecks.md)). Arquivos em `infra/banco/backup/`; instalado no servidor em 2026-11-02 (bucket `asttra-backups`, token `asttra-backups-restic`).
+- **Backup:** diário às 03:00 com restic no bucket `asttra-backups` do Cloudflare R2, guardando 7 cópias diárias e 4 semanais, com alerta pelo Healthchecks.io e teste de restauração mensal manual ([ADR 0003](docs/adr/0003-backup-com-restic-e-healthchecks.md)). Arquivos em `infra/banco/backup/`; instalado no servidor em 2026-11-02 (bucket `asttra-backups`, token `asttra-backups-restic`); primeiro backup automático confirmado em 2026-11-03.
 - **Banco:** PostgreSQL 18 e Redis 8 em `/opt/asttra/banco/` (cópia de `infra/banco/`), na rede Docker `asttra`. PostgreSQL só em `127.0.0.1:5432`; Redis sem porta publicada.
 - **Painel:** no ar em `painel.asttralabs.com.br` desde 2026-11-02 (Access com a policy `Só Davi`, sessão de 1 mês). Container em `/opt/asttra/painel/`, código em `/opt/asttra/painel-src/`, porta só em `127.0.0.1:18000`.
 - **Subdomínios propostos:** `agentes.` (Paperclip) e `automacoes.` (n8n).
@@ -133,5 +133,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Fechar a Etapa 1, item 2: conferir em 2026-11-03 o snapshot automático das 03:00 (no servidor: `sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic snapshots'`, horário 06:00 UTC) e marcar o item como concluído no Build Plan, no playbook e aqui.
-2. Etapa 1, item 4 (temas, parte do MVP): classificar o risco e gerar a spec com `/asttra:feature`. O item 3 (painel, núcleo) foi concluído em 2026-11-02 e está no ar em `painel.asttralabs.com.br`.
+1. Etapa 1, item 4 (temas, parte do MVP): classificar o risco e gerar a spec com `/asttra:feature`. Os itens 1, 2 e 3 da Etapa 1 estão concluídos (o backup automático foi confirmado em 2026-11-03).

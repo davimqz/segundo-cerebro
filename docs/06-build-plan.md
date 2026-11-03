@@ -35,10 +35,10 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
 
 1. [x] **Repositórios no GitHub:** o painel fica neste repositório, na pasta `painel/` ([ADR 0002](adr/0002-painel-no-repositorio-do-projeto.md)), e a base de conhecimento em `davimqz/asttra-conhecimento` (privado), com as pastas dos 5 departamentos.
    - Pronto quando: o Obsidian abre a base e sincroniza com o GitHub. Testado em 2026-11-02 com o plugin Obsidian Git.
-2. **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2 (veio da Etapa 0: só agora há dados para copiar).
+2. [x] **Banco de dados:** PostgreSQL e Redis no servidor, um banco por serviço, com backup diário para o Cloudflare R2 (veio da Etapa 0: só agora há dados para copiar).
    - Pronto quando: os serviços conectam, cada um no seu banco, e um backup aparece no R2.
    - Spec: [001](specs/001-banco-e-backup.md). Arquivos em `infra/banco/`; passo a passo no playbook, capítulo "Banco e backup".
-   - Andamento (2026-11-02): instalado no servidor. Conferidos: containers `healthy`, portas, isolamento dos bancos, `NOAUTH` no Redis, backup manual e pelo systemd no R2, restauração com contagens iguais, e-mail de falha do Healthchecks.io e acesso pelo DBeaver via túnel. Falta: o snapshot automático das 03:00 de 2026-11-03.
+   - Concluído em 2026-11-03 (instalado no servidor em 2026-11-02). Conferidos: containers `healthy`, portas, isolamento dos bancos, `NOAUTH` no Redis, backup manual e pelo systemd no R2, restauração com contagens iguais, e-mail de falha do Healthchecks.io e acesso pelo DBeaver via túnel. O primeiro snapshot automático rodou em 2026-11-03 às 06:00 UTC (03:00 de Brasília).
 3. [x] **Painel, núcleo:** login com e-mail e senha, menu com as 9 telas, tema Selecta claro e escuro, tabelas do núcleo, avisos e Atividades.
    - Pronto quando: Davi entra no painel pelo subdomínio e troca entre claro e escuro.
    - Spec: [002](specs/002-painel-nucleo.md). Código em `painel/`, implantação em `infra/painel/`; passo a passo no playbook, capítulo "Painel".
