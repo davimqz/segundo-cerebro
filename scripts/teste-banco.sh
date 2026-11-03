@@ -153,14 +153,17 @@ bash "$TMP/banco/backup/backup.sh" >/dev/null
 total="$(snapshots banco)"
 # 7 dias seguidos + até 4 semanas (algumas coincidem com os dias): entre 7 e 11.
 [[ "$total" -ge 7 && "$total" -le 11 ]] || falhar "retenção deixou $total snapshots (esperado 7 a 11)"
-# A retenção de uma tag não apaga a outra: os 2 da pasta do Paperclip (mesmo dia) viram 1.
-[[ "$(snapshots paperclip)" -eq 1 ]] || falhar "a retenção deveria deixar 1 snapshot com a tag paperclip"
+# A retenção de uma tag não apaga a outra: os 2 da pasta do Paperclip (mesmo dia) continuam, porque
+# com menos de 7 dias de cópias o restic guarda também a mais antiga ("oldest daily snapshot").
+PAPERCLIP_SNAPS="$(snapshots paperclip)"
+[[ "$PAPERCLIP_SNAPS" -ge 1 && "$PAPERCLIP_SNAPS" -le 2 ]] ||
+  falhar "a retenção deixou $PAPERCLIP_SNAPS snapshots com a tag paperclip (esperado 1 ou 2)"
 echo "   ok ($total snapshots do banco)"
 
 echo "== Servidor sem Paperclip: backup segue só com o banco"
 PAPERCLIP_DADOS="$TMP/nao-existe" bash "$TMP/banco/backup/backup.sh" >"$TMP/sem-paperclip.log"
 grep -q "pasta de dados do Paperclip não existe" "$TMP/sem-paperclip.log" || falhar "backup.sh não avisou que pulou a pasta"
-[[ "$(snapshots paperclip)" -eq 1 ]] || falhar "backup sem a pasta não deveria criar snapshot paperclip"
+[[ "$(snapshots paperclip)" -eq "$PAPERCLIP_SNAPS" ]] || falhar "backup sem a pasta não deveria criar snapshot paperclip"
 # restaurar.sh num repositório que nunca teve a tag paperclip.
 REPO_PRINCIPAL="$RESTIC_REPOSITORY"
 export RESTIC_REPOSITORY="$TMP/restic-sem-paperclip"
