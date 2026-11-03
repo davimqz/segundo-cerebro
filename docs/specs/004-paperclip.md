@@ -2,7 +2,7 @@
 
 - Risco: R2
 - Origem: Build Plan, Etapa 1, item 5; PRD, RF02 e RF03 e "Fase 1 – MVP"; TRD, "Componentes", "Rede", "Dados" e "Riscos técnicos"; App Flow, "Fluxo de aprovação"
-- Status: Rascunho
+- Status: Em implementação
 
 ## Objetivo
 O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PRD, RF02 e RF03). Este item instala o Paperclip no servidor, em `agentes.asttralabs.com.br`. Ele usa o banco `paperclip`, que já existe, e tem a empresa, os 5 departamentos e a regra base de aprovação configurados. O Hermes só entra no item 6. Aqui basta provar que um pedido de aprovação criado pela API aparece na tela e pode ser aprovado.
@@ -12,10 +12,17 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 **Decisões do Davi (2026-11-03):**
 - Os departamentos viram 5 projetos dentro de uma empresa. Não são agentes, porque o único agente permanente é o Hermes.
 - O Paperclip usa o nosso PostgreSQL 18.
-- A imagem é construída no servidor a partir de uma versão fixa, como no ADR 0005.
+- A imagem é construída no servidor a partir de uma versão fixa, como no ADR 0005. Revisto na implementação: veja a imagem oficial por digest logo abaixo.
 - O teste é feito pela API, com `curl`.
 - A regra base tem três partes: a trava de contratação, o orçamento zero e a regra escrita.
 - A pasta de dados do Paperclip, com a `master.key`, entra no backup diário.
+
+**Decisões do Davi na implementação (2026-11-03):**
+- **Orçamento 0 = sem limite.** No código do Paperclip, um orçamento menor ou igual a 0 nunca pausa nada. Ele fica em 0 e isso é registrado. A proteção de custo é não configurar chave de modelo pago e usar só modelos gratuitos do OpenRouter.
+- **Dockerfile próprio sem as CLIs de terceiros** ([ADR 0006](../adr/0006-paperclip-da-imagem-oficial-com-postgresql-externo.md)). A imagem oficial instala Claude Code (proprietário), Codex, Gemini, Kimi e OpenCode em `@latest`.
+- **Sem compilar no servidor.** Compilar o Paperclip passou de 7,3 GB de memória e derrubou o Docker duas vezes. O nosso Dockerfile parte da imagem oficial da versão, presa pelo digest (`PAPERCLIP_IMAGEM`), e copia só o `/app`.
+- **CI:** o `scripts/teste-paperclip.sh` roda só nos PRs que mudam `infra/paperclip/**` ou o próprio script, porque baixar a imagem oficial (cerca de 2,5 GB) e montar a final leva vários minutos.
+- **Projetos:** os nomes vêm de `PAPERCLIP_PROJETOS` no `configuracao.env`, porque o painel ainda não tem a API `/api/v1`. Quando ela existir, a fonte muda.
 
 ## Critérios de aceite
 **Instalação e rede**
@@ -35,12 +42,12 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 - A `master.key` só sai do servidor cifrada pelo restic. Ela nunca vai para o Git, para docs ou para logs.
 
 **Empresa e departamentos**
-- Quando a configuração termina, deve existir uma empresa com o nome vindo do `.env` de configuração (na Asttra, "Asttra Labs"). Ela deve ter 5 projetos: Crescimento, Entrega, Clientes, Administração e Direção. Os nomes saem da tabela `departamentos` do painel, para a estrutura poder ser replicada, e nada fica fixo no código.
+- Quando a configuração termina, deve existir uma empresa com o nome vindo do `.env` de configuração (na Asttra, "Asttra Labs"). Ela deve ter 5 projetos: Crescimento, Entrega, Clientes, Administração e Direção. Os nomes vêm de `PAPERCLIP_PROJETOS` no `configuracao.env`, com os mesmos nomes da tabela `departamentos` do painel. Assim a estrutura pode ser replicada e nada fica fixo no código.
 - Nenhum agente é criado neste item.
 
 **Regra base de aprovação**
 - Quando um agente tenta contratar outro agente, o Paperclip deve exigir aprovação do board (`hire_agent`). A trava nativa fica ligada.
-- O orçamento mensal da empresa fica em zero. Na implantação, conferir se o orçamento zero pausa também os agentes que usam modelos gratuitos. Se pausar, a implantação para e volta para o Davi.
+- O orçamento mensal da empresa fica em zero. No Paperclip, isso quer dizer sem limite: o orçamento não pausa nem os modelos gratuitos nem os pagos. A regra escrita registra isso.
 - A meta ou descrição da empresa no Paperclip deve conter a regra escrita: "Tudo que sai da empresa, publica, gasta dinheiro, aceita termos ou apaga dados vira um pedido `request_board_approval` e espera a decisão do Davi. Ler, pesquisar, resumir, organizar, criar tarefas internas e preparar rascunhos não precisa de aprovação." O mesmo texto fica em `infra/paperclip/regra-de-aprovacao.md`, que é a fonte, porque o PRD manda manter a regra também fora do Paperclip.
 
 **Pedido de aprovação de teste (Pronto quando)**
@@ -57,12 +64,15 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 - Atualização automática de versão: trocar a versão é um passo manual e deliberado.
 
 ## Arquivos e interfaces
-- `infra/paperclip/compose.yml` (novo): serviço `paperclip` construído de `${PAPERCLIP_SRC}` com `--target production` e imagem `asttra-paperclip:<versão>`. Tem:
-  - porta `127.0.0.1:18100:3100`, rede `asttra`, `mem_limit` de 1 GB e `pids_limit`;
-  - `no-new-privileges` e usuário não root (a imagem já não roda como root; o PostgreSQL embutido recusa root);
+- `infra/paperclip/compose.yml` (novo): o serviço `paperclip` monta, com o nosso `infra/paperclip/Dockerfile`, a imagem `asttra-paperclip:<versão>` a partir de `${PAPERCLIP_IMAGEM}` (imagem oficial presa pelo digest), sem as CLIs. Ele tem:
+  - porta `127.0.0.1:18100:3100`, rede `asttra`, `mem_limit` de 1,5 GB (com `NODE_OPTIONS=--max-old-space-size=1024`) e `pids_limit`. Com 1 GB, o Node estourou o heap nas 330 migrações da primeira subida; o pico medido foi de cerca de 810 MB;
+  - `no-new-privileges` e o usuário 1000 (`node`), sem root;
   - volume `./dados:/paperclip`, `healthcheck` e `restart: unless-stopped`.
 - `infra/paperclip/.env.example` (novo): `DATABASE_URL`, `BETTER_AUTH_SECRET`, `PAPERCLIP_AGENT_JWT_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET`, `PAPERCLIP_PUBLIC_URL`, `PAPERCLIP_AUTH_PUBLIC_BASE_URL`, `PAPERCLIP_ALLOWED_HOSTNAMES`, `PAPERCLIP_DEPLOYMENT_MODE=authenticated`, `PAPERCLIP_DEPLOYMENT_EXPOSURE=private`, `TRUST_PROXY=1`, `PAPERCLIP_TELEMETRY_DISABLED=1`, `DO_NOT_TRACK=1` e `PAPERCLIP_VERSAO`. Os segredos ficam vazios, com a instrução `openssl rand -hex 32`, um valor diferente para cada um.
-- `infra/paperclip/configurar.sh` (novo, idempotente, ou seja, rodar de novo não duplica nada): cria a empresa, os 5 projetos (lidos da tabela `departamentos` pela API do painel ou de uma lista no `.env`), liga a trava de contratação, zera o orçamento e grava a regra escrita. Usa a API do Paperclip com a chave de board passada por variável de ambiente.
+- `infra/paperclip/configurar.sh` (novo, idempotente, ou seja, rodar de novo não duplica nada): cria a empresa, os 5 projetos (de `PAPERCLIP_PROJETOS`), liga a trava de contratação, zera o orçamento e grava a regra escrita. Usa a API do Paperclip com uma chave de board temporária. O script a pede pelo fluxo de aprovação do próprio Paperclip e a revoga no fim; no teste, ela pode vir de `PAPERCLIP_CHAVE`. As funções comuns ficam em `infra/paperclip/lib.sh`.
+- `infra/paperclip/convite-admin.sh` (novo): gera o convite do primeiro admin, porque a CLI oficial não funciona dentro do container (ADR 0006).
+- `infra/paperclip/Dockerfile` e `infra/paperclip/configuracao.env.example` (novos).
+- `infra/paperclip/criar-master-key.sh` (novo): cria a `master.key` antes da primeira subida. O Paperclip só a cria quando grava o primeiro segredo, e sem ela o backup e o `restaurar.sh` não teriam a chave.
 - `infra/paperclip/teste-aprovacao.sh` (novo): cria o pedido de teste, espera o Davi aprovar na tela (consulta o status a cada poucos segundos, com tempo-limite) e imprime o resultado.
 - `infra/paperclip/regra-de-aprovacao.md` (novo): o texto da regra base.
 - `infra/banco/backup/backup.sh`: incluir `/opt/asttra/paperclip/dados` no restic, com `--host asttra-banco --tag paperclip`, e um `restic forget` com a mesma retenção. O caminho vem de uma variável (`PAPERCLIP_DADOS`, com esse padrão) no `backup.env`, para a estrutura poder ser replicada.
@@ -70,13 +80,13 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 - `infra/banco/backup/restaurar.sh`: conferir o snapshot da pasta de dados (`restic ls` com a tag `paperclip`, procurando a `master.key`).
 - `scripts/check.sh`: o ShellCheck passa a cobrir os scripts novos.
 - `docs/00-playbook-infra.md`: novo capítulo "Paperclip" com o passo a passo, cada comando dizendo onde roda, e uma tabela de erros comuns.
-- `docs/adr/0006-paperclip-construido-no-servidor-com-postgresql-externo.md` (proposto): por que construir de uma tag fixa e usar o PostgreSQL 18 compartilhado em vez do banco embutido.
+- `docs/adr/0006-paperclip-da-imagem-oficial-com-postgresql-externo.md` (proposto): por que construir de uma tag fixa e usar o PostgreSQL 18 compartilhado em vez do banco embutido.
 - Cloudflare (feito à mão, registrado no playbook): rota `agentes.asttralabs.com.br` → `http://localhost:18100` no tunnel `vps-asttra` e aplicação no Access com a policy `Só Davi`.
 
 ## Perguntas em aberto
 - **PostgreSQL 18:** a documentação só mostra a versão 17. Isso só se descobre na implantação (ver o critério do banco).
-- **Orçamento zero e modelos gratuitos:** é preciso confirmar na implantação se o orçamento zero bloqueia também os modelos gratuitos.
-- **Primeiro login:** a documentação descreve o `paperclipai auth bootstrap-ceo` e o "primeiro login vira admin" no modo privado, mas não explica como fazer isso dentro do Docker. Testar o caminho e registrar no playbook.
+- ~~**Orçamento zero e modelos gratuitos.**~~ Resolvido: 0 quer dizer sem limite e não bloqueia nada.
+- ~~**Primeiro login.**~~ Resolvido: a CLI exige um `config.json`, que o Docker não tem. O `convite-admin.sh` grava o convite de uso único no banco, como a CLI faz, e mostra o link.
 - **Versão:** fixar a release mais recente na data da implantação (a última vista é `v2026.1023.0`, de 2026-10-23) e conferir as issues abertas sobre instalações próprias antes.
 
 ## Plano
@@ -93,7 +103,7 @@ O Paperclip é onde ficam as tarefas e os pedidos de aprovação dos agentes (PR
 
 **Testes previstos:**
 - Unidade: não se aplica, porque não há código do painel neste item. O ShellCheck cobre os scripts.
-- Integração: um novo `scripts/teste-paperclip.sh`, que roda no CI. Ele sobe um PostgreSQL 18 descartável e o Paperclip numa tag fixa, depois:
+- Integração: um novo `scripts/teste-paperclip.sh`, que roda no CI quando `infra/paperclip/**` muda. Ele sobe um PostgreSQL 18 descartável e o Paperclip numa tag fixa, depois:
   - confere as migrações e o `/api/health`;
   - roda o `configurar.sh` duas vezes e confere 1 empresa, 5 projetos, a trava de contratação ligada e o orçamento zero;
   - cria um `request_board_approval`, aprova pela API e confere o `approved`.

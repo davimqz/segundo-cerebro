@@ -501,6 +501,155 @@ cd /opt/asttra/painel
 sudo docker compose exec painel pnpm usuario senha
 ```
 
+## Paperclip
+
+O Paperclip guarda as tarefas e os pedidos de aprovação dos agentes. Ele roda num container no servidor, atrás do Cloudflare Tunnel e do Cloudflare Access, com login próprio. Spec: [`specs/004-paperclip.md`](specs/004-paperclip.md). Decisão: [ADR 0006](adr/0006-paperclip-da-imagem-oficial-com-postgresql-externo.md), sobre a imagem oficial da versão presa pelo digest, sem as CLIs de terceiros e sem compilar no servidor, e o PostgreSQL compartilhado.
+
+No servidor:
+- `/opt/asttra/paperclip`: cópia de `infra/paperclip/` deste repositório. Tem:
+  - o `.env` (permissão `600`, dono `root`);
+  - o `configuracao.env` (empresa e projetos, sem segredos);
+  - a pasta `dados/` (do usuário 1000, com a `master.key`, que entra no backup diário).
+
+O container escuta só em `127.0.0.1:18100`, usa o banco `paperclip` e aplica as migrações dele na subida. Ele responde em `/api/health`. Tem limite de 1,5 GB de memória: na primeira subida, as 330 migrações levaram o uso a cerca de 810 MB, e o limite de 1 GB da spec estourava o heap do Node.
+
+Os scripts de `infra/paperclip/` que mexem na configuração não usam senha nem chave guardada. Eles mostram um link, você aprova no navegador (já logado no Paperclip) e, no fim, eles revogam a chave temporária.
+
+**Antes de começar:** o PR da spec 004 precisa estar na `main`. Os arquivos saem de `/opt/asttra/painel-src`.
+
+### Instalação
+
+54. **Conferir que a porta está livre e instalar o `jq`** (no servidor). O `ss` não deve mostrar nada. O `jq` lê as respostas da API nos scripts.
+
+```bash
+ss -tlnp | grep ':18100'
+sudo apt-get install -y jq
+```
+
+55. **Conferir a versão** (navegador). Veja em `github.com/paperclipai/paperclip`, aba Releases, se há versão mais nova que a do `infra/paperclip/.env.example` e se há issues abertas sobre instalações próprias. Para trocar de versão, siga "Trocar a versão do Paperclip" antes de continuar.
+
+56. **Copiar a implantação e criar a pasta de dados** (no servidor). A pasta `dados` fica com o usuário 1000, que é o usuário do processo dentro do container, e só ele a lê.
+
+```bash
+cd /opt/asttra/painel-src && git pull
+sudo cp -r /opt/asttra/painel-src/infra/paperclip /opt/asttra/paperclip
+sudo chown -R root:root /opt/asttra/paperclip
+sudo chmod 755 /opt/asttra/paperclip/*.sh
+sudo install -d -o 1000 -g 1000 -m 700 /opt/asttra/paperclip/dados
+```
+
+57. **Criar o `.env` e o `configuracao.env`** (no servidor). Os três segredos são gerados na hora, um diferente para cada. A senha do banco vem do `.env` do banco. Nada aparece na tela; o `cut` mostra só os nomes.
+
+```bash
+cd /opt/asttra/paperclip
+sudo install -m 600 -o root -g root /dev/null .env
+sudo bash -c 'S=$(grep "^PAPERCLIP_DB_PASSWORD=" /opt/asttra/banco/.env | cut -d= -f2-); cat > /opt/asttra/paperclip/.env <<EOF
+$(grep -E "^PAPERCLIP_(VERSAO|IMAGEM)=" /opt/asttra/paperclip/.env.example)
+DATABASE_URL=postgres://paperclip:$S@postgres:5432/paperclip
+BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+PAPERCLIP_AGENT_JWT_SECRET=$(openssl rand -hex 32)
+PAPERCLIP_TOOL_ACTION_SIGNING_SECRET=$(openssl rand -hex 32)
+PAPERCLIP_PUBLIC_URL=https://agentes.asttralabs.com.br
+PAPERCLIP_AUTH_PUBLIC_BASE_URL=https://agentes.asttralabs.com.br
+PAPERCLIP_ALLOWED_HOSTNAMES=agentes.asttralabs.com.br
+TRUST_PROXY=1
+PAPERCLIP_PORTA=18100
+TZ=America/Sao_Paulo
+EOF'
+sudo cut -d= -f1 .env
+sudo sed 's#https://agentes.exemplo.com.br#https://agentes.asttralabs.com.br#' configuracao.env.example | sudo tee configuracao.env
+```
+
+58. **Montar a imagem** (no servidor). Baixa a imagem oficial presa pelo digest (cerca de 2,5 GB, só na primeira vez) e monta a final, sem as CLIs de terceiros. Não compila nada.
+
+```bash
+cd /opt/asttra/paperclip
+sudo docker compose build paperclip
+```
+
+59. **Criar a `master.key`** (no servidor). O Paperclip só cria a chave quando grava o primeiro segredo. Criada agora, ela entra no backup desde o primeiro dia. A chave é gerada dentro do container e não aparece na tela. Deve responder "master.key criada"; rodar de novo responde "já existe".
+
+```bash
+sudo /opt/asttra/paperclip/criar-master-key.sh
+```
+
+60. **Subir e conferir** (no servidor). Confira estes resultados:
+    - o `paperclip` aparece como `healthy`;
+    - a porta 18100 aparece só em `127.0.0.1`;
+    - o UFW continua só com o OpenSSH;
+    - o log mostra as migrações aplicadas, sem erro;
+    - a `master.key` aparece na pasta de dados.
+
+    **Se as migrações falharem no PostgreSQL 18, pare aqui** (`sudo docker compose down`) e leve o log ao Davi. Não troque para o banco embutido nem para outra versão sem aprovação.
+
+```bash
+cd /opt/asttra/paperclip
+sudo docker compose up -d --wait
+sudo docker compose ps
+ss -tlnp | grep ':18100'
+sudo ufw status
+sudo docker compose logs paperclip | grep -i migrat
+sudo ls -l dados/instances/default/secrets/
+```
+
+61. **Criar a rota no tunnel** (navegador: Zero Trust → Networks → Tunnels → `vps-asttra` → Published application routes → Add). Aponte `agentes.asttralabs.com.br` para `http://localhost:18100`.
+62. **Proteger com o Cloudflare Access** (Zero Trust → Access → Applications → Add → Self-hosted). Use o nome `Paperclip`, o subdomínio `agentes`, a policy `Só Davi`, login por código no e-mail e sessão de 1 mês. Confira no Preview que o destino é `agentes.asttralabs.com.br`.
+63. **Criar o primeiro admin** (no servidor, depois no navegador). O script mostra um link de uso único que vale 1 hora. Abra o link, crie a conta com o seu e-mail e uma senha nova e aceite o convite. Guarde a senha no gerenciador como "Paperclip – login do Davi". Rodar o script de novo depois disso só responde que já há admin.
+
+```bash
+sudo /opt/asttra/paperclip/convite-admin.sh
+```
+
+64. **Configurar a empresa** (no servidor, depois no navegador). O script mostra um link. Abra-o no navegador já logado no Paperclip e aprove o acesso. Ele cria a empresa "Asttra Labs" e os 5 projetos, liga a trava de contratação, deixa o orçamento em 0 (que no Paperclip quer dizer sem limite) e grava a regra de `regra-de-aprovacao.md`. O resultado deve terminar com "Configuração concluída" e "Chave temporária revogada". Rodar de novo não duplica nada.
+
+```bash
+/opt/asttra/paperclip/configurar.sh
+```
+
+65. **Incluir a pasta de dados no backup** (no servidor). Copie a versão nova dos scripts de backup e acrescente o `PAPERCLIP_DADOS` ao `backup.env`. Depois rode um backup à mão e confira o snapshot com a tag `paperclip`. O `restaurar.sh` deve terminar com "contém a master.key" e "contagens iguais".
+
+```bash
+sudo cp /opt/asttra/painel-src/infra/banco/backup/{backup.sh,restaurar.sh,backup.env.example} /opt/asttra/banco/backup/
+sudo chmod 755 /opt/asttra/banco/backup/*.sh
+sudo grep -q '^PAPERCLIP_DADOS=' /opt/asttra/banco/backup/backup.env || echo 'PAPERCLIP_DADOS=/opt/asttra/paperclip/dados' | sudo tee -a /opt/asttra/banco/backup/backup.env
+sudo /opt/asttra/banco/backup/backup.sh
+sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic snapshots --tag paperclip'
+sudo /opt/asttra/banco/backup/restaurar.sh
+```
+
+66. **Teste de aprovação (o "Pronto quando")** (no servidor e no navegador). Primeiro o script pede acesso; aprove o link como no passo 64. Depois ele cria o pedido de teste. No Paperclip, abra Approvals, veja o pedido "Pedido de teste (spec 004)" como pendente e clique em Approve. O script deve imprimir `Status do pedido: approved` e "Chave temporária revogada".
+
+```bash
+/opt/asttra/paperclip/teste-aprovacao.sh
+```
+
+67. **Conferir a persistência e o acesso** (no servidor, depois no celular fora da rede de casa).
+    - Recrie o container com o comando abaixo.
+    - Abra `https://agentes.asttralabs.com.br`. Deve aparecer primeiro o código da Cloudflare e depois o login do Paperclip.
+    - Dentro, a empresa deve ter os 5 projetos, a regra na descrição e o pedido de teste como aprovado.
+
+```bash
+cd /opt/asttra/paperclip && sudo docker compose up -d --force-recreate --wait
+```
+
+### Trocar a versão do Paperclip
+
+A troca é manual e deliberada. Antes, leia as notas da versão nova e compare o `Dockerfile` oficial com o `infra/paperclip/Dockerfile`, principalmente as variáveis e o comando final (ADR 0006).
+1. No Windows, ache o digest da versão nova com `docker buildx imagetools inspect ghcr.io/paperclipai/paperclip:<versão sem o v>` (linha "Digest"). Mude `PAPERCLIP_VERSAO` e `PAPERCLIP_IMAGEM` em `infra/paperclip/.env.example`, rode `bash scripts/teste-paperclip.sh` e faça o PR.
+2. Rode um backup manual (passo 65).
+3. No servidor, depois do merge:
+
+```bash
+cd /opt/asttra/painel-src && git pull
+cd /opt/asttra/paperclip
+sudo sed -i "s#^PAPERCLIP_VERSAO=.*#$(grep '^PAPERCLIP_VERSAO=' /opt/asttra/painel-src/infra/paperclip/.env.example)#; s#^PAPERCLIP_IMAGEM=.*#$(grep '^PAPERCLIP_IMAGEM=' /opt/asttra/painel-src/infra/paperclip/.env.example)#" .env
+sudo grep -E '^PAPERCLIP_(VERSAO|IMAGEM)=' .env
+sudo docker compose build paperclip
+sudo docker compose up -d --wait
+```
+
+A imagem anterior continua no servidor. Para voltar atrás, volte as duas linhas do `.env` e rode `sudo docker compose up -d`. Quando a versão nova estiver estável, libere espaço com `sudo docker image prune -a` (apaga as imagens que nenhum container usa). Se a versão nova já aplicou migrações, volte também o banco `paperclip` pelo backup.
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -514,6 +663,7 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - **Healthchecks.io – URL de ping**: a URL da checagem `asttra-backup`.
 - As senhas do PostgreSQL e do Redis ficam só em `/opt/asttra/banco/.env` (geradas no servidor).
 - **Painel – login do Davi**: e-mail e senha do login próprio do painel (passo 50). O segredo das sessões (`BETTER_AUTH_SECRET`) fica só em `/opt/asttra/painel/.env`.
+- **Paperclip – login do Davi**: e-mail e senha do login próprio do Paperclip (passo 63). Os segredos (`BETTER_AUTH_SECRET`, `PAPERCLIP_AGENT_JWT_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET`) ficam só em `/opt/asttra/paperclip/.env`. A `master.key` fica só na pasta de dados e no backup cifrado.
 
 Se a chave for perdida, o acesso é recuperado pelo terminal do painel do provedor, instalando uma nova chave pública.
 
@@ -541,6 +691,13 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | O login responde "Muitas tentativas" | Muitas tentativas do mesmo IP em 15 minutos | Esperar 15 minutos; se esqueceu a senha, trocar pelo servidor ("Trocar ou recuperar a senha do painel") |
 | O subdomínio do painel responde 502 | A rota do tunnel aponta para o lugar errado (tipo `HTTPS` em vez de `HTTP`, ou URL diferente de `localhost:18000`) | Corrigir a rota no tunnel `vps-asttra`; o cloudflared usa `network_mode: host`, então `localhost` é o servidor |
 | O Access protege o domínio inteiro em vez do subdomínio | O campo Subdomain ficou vazio em Destinations | Preencher Subdomain (`painel`) e conferir no Preview o destino `painel.asttralabs.com.br` antes de salvar |
+| O Paperclip reinicia em loop e o log mostra `EACCES` em `/paperclip` | A pasta `dados` não é do usuário 1000 | `sudo chown -R 1000:1000 /opt/asttra/paperclip/dados` (passo 56) |
+| O Paperclip responde "This hostname is not allowed" | O endereço público não está em `PAPERCLIP_ALLOWED_HOSTNAMES` | Conferir o `.env` (passo 57) e recriar o container |
+| `configurar.sh` dá "jq não encontrado" | Falta o `jq` no servidor | `sudo apt-get install -y jq` (passo 54) |
+| O link de aprovação do script mostra a tela de login | O navegador não está logado no Paperclip | Entrar no Paperclip e abrir o link de novo (vale 10 minutos) |
+| `configurar.sh` dá "Instance admin required" | A conta que aprovou o link não é a admin do passo 63 | Aprovar com a conta do Davi |
+| `convite-admin.sh` dá "permission denied" no `.env` | O script chama o `docker compose` do banco, que lê o `.env` do root | Rodar com `sudo` |
+| `docker compose build` dá "manifest unknown" ou "not found" | `PAPERCLIP_IMAGEM` com versão ou digest errado | Conferir com `docker buildx imagetools inspect` (ver "Trocar a versão do Paperclip") |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Teste de restauração: baixa um snapshot do restic e restaura cada banco, um de cada vez,
 # num banco separado (restauracao_teste). Compara a contagem de linhas por tabela com o
-# original. O banco de produção só é lido, nunca alterado.
+# original. O banco de produção só é lido, nunca alterado. Também confere que o último snapshot
+# da pasta de dados do Paperclip (tag paperclip) contém a master.key.
 #
 # Uso: sudo /opt/asttra/banco/backup/restaurar.sh [ID_DO_SNAPSHOT]   (padrão: o último)
 #
@@ -24,6 +25,7 @@ fi
 
 : "${RESTIC_REPOSITORY:?defina RESTIC_REPOSITORY no backup.env}"
 : "${RESTIC_PASSWORD:?defina RESTIC_PASSWORD no backup.env}"
+PAPERCLIP_DADOS="${PAPERCLIP_DADOS:-/opt/asttra/paperclip/dados}"
 
 pg() {
   docker compose --project-directory "$BANCO_DIR" exec -T postgres "$@"
@@ -90,6 +92,28 @@ for dump in "${dumps[@]}"; do
     diferencas=1
   fi
 done
+
+# Pasta de dados do Paperclip: confere que o último snapshot existe e tem a master.key, sem
+# restaurar nada (a pasta em uso nunca é sobrescrita).
+echo "== Pasta de dados do Paperclip"
+# As saídas do restic vão para variáveis antes do grep: com pipefail, um grep sem resultado (ou
+# um grep -q que fecha o pipe cedo) faria o pipeline falhar sem mensagem.
+lista_snapshots="$(restic snapshots --host asttra-banco --tag paperclip --json)"
+paperclip_snapshots="$(grep -o '"short_id"' <<<"$lista_snapshots" | wc -l || true)"
+if [[ "$paperclip_snapshots" -eq 0 ]]; then
+  if [[ -d "$PAPERCLIP_DADOS" ]]; then
+    echo "   A pasta $PAPERCLIP_DADOS existe, mas não há snapshot com a tag paperclip." >&2
+    diferencas=1
+  else
+    echo "   Sem Paperclip neste servidor: pulada."
+  fi
+elif lista_arquivos="$(restic ls latest --host asttra-banco --tag paperclip)" &&
+  grep -q '/master\.key$' <<<"$lista_arquivos"; then
+  echo "   Último snapshot com a tag paperclip contém a master.key."
+else
+  echo "   O último snapshot com a tag paperclip não contém a master.key." >&2
+  diferencas=1
+fi
 
 if [[ $diferencas -ne 0 ]]; then
   echo "Restauração com diferenças." >&2

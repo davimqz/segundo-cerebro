@@ -1,0 +1,51 @@
+# Paperclip (governança: tarefas, aprovações e auditoria dos agentes). Spec 004, ADR 0006.
+# No servidor fica em /opt/asttra/paperclip/ (cópia desta pasta), com o .env ao lado e os dados
+# em ./dados (inclui a master.key, que entra no backup diário).
+# A imagem parte da imagem oficial da versão fixa, pelo digest (PAPERCLIP_IMAGEM), sem as CLIs.
+# Precisa da rede "asttra" e do PostgreSQL de infra/banco no ar.
+#
+# Construir e subir: sudo docker compose build paperclip && sudo docker compose up -d --wait
+
+services:
+  paperclip:
+    build:
+      context: .
+      args:
+        PAPERCLIP_IMAGEM: ${PAPERCLIP_IMAGEM:?defina PAPERCLIP_IMAGEM no .env}
+    image: asttra-paperclip:${PAPERCLIP_VERSAO:?defina PAPERCLIP_VERSAO no .env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Fixos aqui, para não depender do .env: login obrigatório, sem telemetria e migrações
+      # aplicadas na subida (o container não tem terminal para confirmar).
+      PAPERCLIP_DEPLOYMENT_MODE: authenticated
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: private
+      PAPERCLIP_TELEMETRY_DISABLED: "1"
+      DO_NOT_TRACK: "1"
+      PAPERCLIP_MIGRATION_AUTO_APPLY: "true"
+      # Sem isto o Node limita o heap a ~metade do mem_limit e estoura nas 330+ migrações da
+      # primeira subida (o servidor roda TypeScript pelo tsx, que pesa na memória).
+      NODE_OPTIONS: --max-old-space-size=1024
+    # Só no 127.0.0.1: o Docker ignora o UFW. O Cloudflare Tunnel (network_mode: host) chega por aqui.
+    ports:
+      - "127.0.0.1:${PAPERCLIP_PORTA:-18100}:3100"
+    # A pasta precisa ser do usuário 1000 (node), que roda o processo.
+    volumes:
+      - ./dados:/paperclip
+    user: "1000:1000"
+    mem_limit: 1536m
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    networks:
+      - asttra
+
+networks:
+  asttra:
+    external: true

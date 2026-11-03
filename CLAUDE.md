@@ -87,6 +87,7 @@ Não use "Sustentação" como nome de departamento: é o nome do contrato mensal
 - Migração nova: mudar `painel/src/core/db/schema.ts` e rodar `pnpm --dir painel db:gerar`. Nunca edite uma migração já aplicada
 - Checagem completa (lint, tipos e testes rápidos): `scripts/check.sh` (ShellCheck; tipos, lint, formatação e testes de unidade do painel; com docker, os testes de integração do painel; com docker e restic, o teste do banco)
 - Testes de integração: `scripts/teste-painel.sh` (PostgreSQL descartável) e `scripts/teste-banco.sh` (sobe `infra/banco` com senhas de teste); os dois rodam sempre no CI
+- Paperclip: `scripts/teste-paperclip.sh` sobe banco e Paperclip (imagem oficial por digest, ADR 0006) e testa admin, `configurar.sh` e aprovação. Fica fora do `check.sh` e, no CI, roda só quando `infra/paperclip` muda. No Git Bash, caminhos do container vão dentro de `sh -c`, e corpo JSON com acento vai pela entrada padrão do `curl`
 - E2E: `scripts/teste-e2e.sh` (sobe banco e painel pelo `infra/painel/compose.yml` e roda o Playwright; precisa de `pnpm --dir painel exec playwright install chromium`)
 
 ## Design
