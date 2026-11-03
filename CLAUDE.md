@@ -133,4 +133,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 4 (temas, parte do MVP): classificar o risco e gerar a spec com `/asttra:feature`. Os itens 1, 2 e 3 da Etapa 1 estão concluídos (o backup automático foi confirmado em 2026-11-03).
+1. Etapa 1, item 5 (Paperclip): classificar o risco e gerar a spec com `/asttra:feature`. Os itens 1 a 4 da Etapa 1 estão concluídos (temas carregados e ativados pela tela desde 2026-11-03, spec 003).

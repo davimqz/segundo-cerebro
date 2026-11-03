@@ -43,8 +43,10 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
    - Pronto quando: Davi entra no painel pelo subdomínio e troca entre claro e escuro.
    - Spec: [002](specs/002-painel-nucleo.md). Código em `painel/`, implantação em `infra/painel/`; passo a passo no playbook, capítulo "Painel".
    - Concluído em 2026-11-02: implantado no servidor (container `healthy`, porta só em `127.0.0.1:18000`), rota no tunnel e Access em `painel.asttralabs.com.br`. Os testes do passo 53 do playbook passaram no computador e no celular.
-4. **Temas, parte do MVP:** carregar um design system e trocar o tema ativo.
+4. [x] **Temas, parte do MVP:** carregar um design system e trocar o tema ativo.
    - Pronto quando: um `tokens.json` carregado muda as cores do painel.
+   - Spec: [003](specs/003-temas-mvp.md). PRs #21 e #22.
+   - Concluído em 2026-11-03: implantado no servidor e conferido por Davi em `painel.asttralabs.com.br` (lista com o Selecta ativo e padrão, tema carregado entra inativo, "Ativar" muda o fundo em todas as telas e depois de recarregar, `tema_instalado` e `tema_ativado` em Atividades, volta ao Selecta).
 5. **Paperclip:** instalado, com os 5 departamentos e a regra base de aprovação.
    - Pronto quando: um pedido de aprovação de teste aparece e pode ser aprovado.
 6. **Hermes no Telegram:** com modelos gratuitos, execução isolada e ligado ao Paperclip.
