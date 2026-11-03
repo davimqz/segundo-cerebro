@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import selecta from "../../../seed/temas/selecta.json";
-import { CORES_OBRIGATORIAS, validarTema } from "./schema";
+import { CORES_OBRIGATORIAS, tokensOpcionaisFaltando, validarTema, type Tema } from "./schema";
 
 const copia = () => structuredClone(selecta) as typeof selecta;
 
@@ -83,5 +83,90 @@ describe("validarTema", () => {
     const tema = copia();
     tema.type.families.sans = "Geist; } * { color: red";
     expect(validarTema(tema).ok).toBe(false);
+  });
+
+  describe("injeção de CSS", () => {
+    // Cada valor tenta fechar a regra, sair da tag <style> ou carregar algo de fora.
+    const perigosos = [
+      "url(https://exemplo.com/x.png)",
+      "URL(x)",
+      "rgb(0 0 0 / url(x))",
+      "color-mix(in srgb, red, url(x))",
+      "@import 'x.css'",
+      "red @import",
+      "expression(alert(1))",
+      "rgb(expression(alert(1)))",
+      "#fff}",
+      "#fff{",
+      "#fff;",
+      "#fff</style><script>alert(1)</script>",
+      "#fff>",
+      "\\66 ff",
+    ];
+
+    it.each(perigosos)("recusa a cor %j", (valor) => {
+      const tema = copia();
+      tema.color.tokens[0].value = { light: valor, dark: "#000000" };
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it.each(perigosos)("recusa a cor de valor único %j", (valor) => {
+      const tema = copia() as unknown as { color: { tokens: { value: unknown }[] } };
+      tema.color.tokens[0].value = valor;
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it.each(perigosos)("recusa a família de fonte %j", (valor) => {
+      const tema = copia();
+      tema.type.families.sans = `"Geist", ${valor}`;
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it.each(perigosos)("recusa a sombra %j", (valor) => {
+      const tema = copia();
+      tema.shadow.tokens[0].value = `0 1px 2px ${valor}`;
+      expect(validarTema(tema).ok).toBe(false);
+    });
+
+    it("continua aceitando cores, fontes e sombras comuns", () => {
+      const tema = copia();
+      tema.color.tokens[0].value = { light: "oklch(0.98 0.01 90)", dark: "color-mix(in srgb, #000 90%, white)" };
+      tema.type.families.sans = '"Inter Display", system-ui, sans-serif';
+      tema.shadow.tokens[0].value = "0 8px 24px rgba(0, 0, 0, 0.18), 0 1px 2px hsl(0 0% 0% / 0.2)";
+      expect(validarTema(tema).ok).toBe(true);
+    });
+  });
+});
+
+describe("tokensOpcionaisFaltando", () => {
+  const slugs = ["crescimento", "entrega", "suporte-novo"];
+
+  function valido(t: unknown): Tema {
+    const r = validarTema(t);
+    if (!r.ok) throw new Error(r.erros.join("; "));
+    return r.tema;
+  }
+
+  it("aponta só os tags dos slugs que o tema não tem", () => {
+    expect(tokensOpcionaisFaltando(valido(selecta), slugs)).toEqual(["tag-suporte-novo"]);
+  });
+
+  it("não aponta nada quando o tema tem tudo", () => {
+    expect(tokensOpcionaisFaltando(valido(selecta), ["crescimento", "direcao"])).toEqual([]);
+  });
+
+  it("aponta title-muted e todos os tags num tema sem eles", () => {
+    const tema = copia();
+    tema.color.tokens = tema.color.tokens.filter((t) => t.name !== "title-muted" && !t.name.startsWith("tag-"));
+    expect(tokensOpcionaisFaltando(valido(tema), slugs)).toEqual([
+      "title-muted",
+      "tag-crescimento",
+      "tag-entrega",
+      "tag-suporte-novo",
+    ]);
+  });
+
+  it("sem departamentos, só confere o title-muted", () => {
+    expect(tokensOpcionaisFaltando(valido(selecta), [])).toEqual([]);
   });
 });

@@ -59,4 +59,18 @@ describe("temaParaCss", () => {
     expect(bloco(saida, ":root")["--t-extra"]).toBe("#123456");
     expect(bloco(saida, ':root[data-modo="escuro"]')["--t-extra"]).toBe("#123456");
   });
+
+  it("valores aceitos pela validação não abrem nem fecham regras no CSS gerado", () => {
+    const r = validarTema({
+      ...structuredClone(selecta),
+      type: { ...selecta.type, families: { sans: '"Inter Display", system-ui', mono: "'JetBrains Mono', monospace" } },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    r.tema.color.tokens[0].value = { light: "color-mix(in srgb, #000 90%, white)", dark: "oklch(0.2 0.01 90)" };
+    const saida = temaParaCss(r.tema);
+    expect(saida.match(/\{/g)).toHaveLength(4);
+    expect(saida.match(/\}/g)).toHaveLength(4);
+    expect(saida).not.toMatch(/<|url\(|@import|expression\(/i);
+  });
 });

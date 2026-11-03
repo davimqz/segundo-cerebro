@@ -26,14 +26,25 @@ export const FAMILIAS_OBRIGATORIAS = ["sans", "mono"] as const;
 export const CANTOS_OBRIGATORIOS = ["radius-none", "radius-xs"] as const;
 
 // Os valores viram CSS dentro de uma tag <style>. As expressões abaixo impedem que um tema
-// carregado feche a regra ou injete outra coisa (sem ; { } < > nem barra invertida).
+// carregado feche a regra ou injete outra coisa (sem ; { } < > nem barra invertida) e, com
+// PROIBIDO, que carregue algo de fora ou rode código (sem url(, @ nem expression(, em qualquer caixa).
 const NOME = /^[a-z0-9][a-z0-9-]*$/;
 const COR =
   /^(#[0-9a-fA-F]{3,8}|(rgb|rgba|hsl|hsla|oklch|oklab|lab|lch|color|color-mix)\([^;{}<>\\]*\)|transparent|currentColor)$/;
 const MEDIDA = /^(0|-?\d+(\.\d+)?(px|rem|em|%))$/;
 const LIVRE = /^[^;{}<>\\]+$/;
 
-const cor = z.string().trim().regex(COR, "cor inválida");
+const PROIBIDO = /url\(|@|expression\(/i;
+
+/** Texto que vira valor de CSS: precisa casar com a expressão e não ter nada de PROIBIDO. */
+const valorCss = (expressao: RegExp, mensagem: string) =>
+  z
+    .string()
+    .trim()
+    .regex(expressao, mensagem)
+    .refine((v) => !PROIBIDO.test(v), mensagem);
+
+const cor = valorCss(COR, "cor inválida");
 
 const tokenDeCor = z
   .object({
@@ -43,7 +54,7 @@ const tokenDeCor = z
   })
   .passthrough();
 
-const tokenSimples = (valor: z.ZodString) =>
+const tokenSimples = (valor: z.ZodType<string>) =>
   z
     .object({
       name: z.string().regex(NOME, "nome de token inválido"),
@@ -64,7 +75,7 @@ export const esquemaDoTema = z
       .passthrough(),
     type: z
       .object({
-        families: z.record(z.string().regex(NOME), z.string().trim().regex(LIVRE, "família inválida")),
+        families: z.record(z.string().regex(NOME), valorCss(LIVRE, "família inválida")),
         groups: z.array(z.unknown()).optional(),
       })
       .passthrough(),
@@ -76,7 +87,7 @@ export const esquemaDoTema = z
       .object({ tokens: z.array(tokenSimples(z.string().trim().regex(MEDIDA, "medida inválida"))) })
       .passthrough(),
     shadow: z
-      .object({ tokens: z.array(tokenSimples(z.string().trim().regex(LIVRE))) })
+      .object({ tokens: z.array(tokenSimples(valorCss(LIVRE, "sombra inválida"))) })
       .passthrough()
       .optional(),
   })
@@ -121,4 +132,16 @@ export function validarTema(entrada: unknown): ResultadoValidacao {
   for (const c of CANTOS_OBRIGATORIOS) if (!cantos.has(c)) erros.push(`Falta o token de canto obrigatório: ${c}`);
 
   return erros.length ? { ok: false, erros } : { ok: true, tema };
+}
+
+/** Token de cor do subtítulo que o tema pode não ter. */
+export const TITULO_OPCIONAL = "title-muted";
+
+/**
+ * Tokens de cor opcionais que faltam no tema: o `title-muted` e um `tag-<slug>` por departamento.
+ * Sem eles, o painel usa a cor de texto secundário. Os slugs vêm do banco, não do código.
+ */
+export function tokensOpcionaisFaltando(tema: Tema, slugs: readonly string[]): string[] {
+  const cores = new Set(tema.color.tokens.map((t) => t.name));
+  return [TITULO_OPCIONAL, ...slugs.map((s) => `tag-${s}`)].filter((nome) => !cores.has(nome));
 }
