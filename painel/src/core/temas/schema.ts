@@ -36,13 +36,29 @@ const LIVRE = /^[^;{}<>\\]+$/;
 
 const PROIBIDO = /url\(|@|expression\(/i;
 
-/** Texto que vira valor de CSS: precisa casar com a expressão e não ter nada de PROIBIDO. */
+// Comentário aberto ou aspa sem fechar não injetam nada, mas engolem o resto do CSS do tema e
+// deixam o painel ilegível. Sem barra invertida (LIVRE e COR), não há aspa escapada.
+const COMENTARIO = /\/\*|\*\//;
+
+function aspasFechadas(valor: string): boolean {
+  let aberta: string | null = null;
+  for (const c of valor) {
+    if (aberta) {
+      if (c === aberta) aberta = null;
+    } else if (c === '"' || c === "'") {
+      aberta = c;
+    }
+  }
+  return aberta === null;
+}
+
+/** Texto que vira valor de CSS: casa com a expressão, sem nada de PROIBIDO, comentário ou aspa aberta. */
 const valorCss = (expressao: RegExp, mensagem: string) =>
   z
     .string()
     .trim()
     .regex(expressao, mensagem)
-    .refine((v) => !PROIBIDO.test(v), mensagem);
+    .refine((v) => !PROIBIDO.test(v) && !COMENTARIO.test(v) && aspasFechadas(v), mensagem);
 
 const cor = valorCss(COR, "cor inválida");
 
