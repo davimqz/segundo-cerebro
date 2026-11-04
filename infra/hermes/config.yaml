@@ -1,0 +1,70 @@
+# Configuração do Hermes (spec 005, ADR 0007). Sem segredos: os valores ${...} vêm do .env.
+# O configurar.sh copia este arquivo para dados/config.yaml (o Hermes lê de /opt/data).
+# Conferido na imagem v0.22.7. Ao trocar de versão, rode scripts/teste-hermes.sh: ele confere
+# que nenhuma ferramenta proibida voltou ligada.
+
+# Modelo: só :free do OpenRouter, numa conta sem créditos. O nome vem de HERMES_MODELO.
+model:
+  provider: openrouter
+  default: "${HERMES_MODELO}"
+  base_url: "https://openrouter.ai/api/v1"
+
+# Sem modelo de reserva: se o gratuito falhar, o Hermes avisa em vez de trocar para um pago.
+fallback_providers: []
+
+# Tarefas auxiliares (resumos, títulos, compressão de contexto) usam o mesmo modelo gratuito.
+# free_only impede que o Hermes caia num modelo pago do OpenRouter para essas tarefas.
+auxiliary:
+  free_only: true
+  openrouter_model: "${HERMES_MODELO}"
+
+# Só provedores que não guardam os dados das conversas. Se o modelo escolhido não tiver nenhum
+# provedor assim, troque para "allow" com a aprovação do Davi (ver playbook, capítulo Hermes).
+provider_routing:
+  data_collection: deny
+
+# Ferramentas, camada 1: a lista permitida em cada plataforma. "paperclip" é o MCP abaixo.
+# api_server é a porta que o Paperclip chama (hermes_gateway); o preset dela vem com terminal.
+platform_toolsets:
+  telegram: [memory, session_search, skills, todo, clarify, paperclip]
+  api_server: [memory, session_search, skills, todo, paperclip]
+
+agent:
+  # Ferramentas, camada 2: proibidas em qualquer plataforma, mesmo se um preset as ligar.
+  # web fica de fora por enquanto: a imagem não tem busca gratuita, e a leitura de páginas
+  # alcançaria a rede interna do Docker.
+  disabled_toolsets:
+    - terminal
+    - code_execution
+    - browser
+    - computer_use
+    - file
+    - delegation
+    - cronjob
+    - image_gen
+    - kanban
+    - skills_hub
+    - web
+
+# Defesa extra: qualquer ação que o Hermes considere perigosa pede confirmação.
+approvals:
+  mode: manual
+
+# MCP próprio do Paperclip (infra/hermes/mcp-paperclip, montado só para leitura).
+mcp_servers:
+  paperclip:
+    command: python3
+    args: ["/opt/asttra/mcp-paperclip/servidor.py"]
+    env:
+      PAPERCLIP_API_URL: "${PAPERCLIP_API_URL}"
+      PAPERCLIP_API_KEY: "${PAPERCLIP_API_KEY}"
+      PAPERCLIP_URL_PUBLICA: "${PAPERCLIP_URL_PUBLICA}"
+    timeout: 30
+    tools:
+      prompts: false
+      resources: false
+
+telemetry:
+  shared_metrics:
+    enabled: false
+    send: false

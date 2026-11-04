@@ -7,6 +7,8 @@
 # O E2E do painel fica fora, para a checagem continuar rápida: bash scripts/teste-e2e.sh
 # O teste do Paperclip também fica fora (baixa uma imagem de ~2,5 GB): bash scripts/teste-paperclip.sh
 # (no CI ele roda pelo workflow paperclip.yml quando infra/paperclip muda).
+# O teste do Hermes também (sobe banco, Paperclip e Hermes): bash scripts/teste-hermes.sh
+# (no CI ele roda pelo workflow hermes.yml quando infra/hermes muda).
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,6 +26,12 @@ else
   exit 1
 fi
 echo "   ok (${#scripts[@]} scripts)"
+
+echo "== MCP do Paperclip para o Hermes: testes de unidade"
+PYTHON="$(command -v python3 || command -v python || true)"
+[[ -n "$PYTHON" ]] || { echo "python3 não encontrado." >&2; exit 1; }
+PYTHONIOENCODING=utf-8 "$PYTHON" -m unittest discover -s infra/hermes/mcp-paperclip -q
+echo "   ok"
 
 echo "== Painel: tipos, lint, formatação e testes de unidade"
 command -v pnpm >/dev/null || { echo "pnpm não encontrado (instale com: npm install -g pnpm)." >&2; exit 1; }

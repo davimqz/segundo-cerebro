@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Backup diário do PostgreSQL e da pasta de dados do Paperclip para o Cloudflare R2, com restic.
+# Backup diário do PostgreSQL e das pastas de dados do Paperclip e do Hermes para o Cloudflare R2,
+# com restic.
 # Roda pelo timer do systemd (asttra-backup.timer) ou à mão: sudo /opt/asttra/banco/backup/backup.sh
 #
 # Passos: avisa o início ao Healthchecks.io, gera os dumps, envia ao restic os dumps (tag banco) e
-# a pasta de dados do Paperclip com a master.key (tag paperclip), aplica a retenção e avisa sucesso
-# ou falha. Os dumps temporários são apagados em qualquer caso.
+# a pasta de dados do Paperclip com a master.key (tag paperclip), a pasta de dados do Hermes com a
+# memória, as sessões e as skills (tag hermes), aplica a retenção e avisa sucesso ou falha. Os dumps temporários são apagados em qualquer caso.
 #
 # Variáveis (de backup.env, ver backup.env.example):
 #   RESTIC_REPOSITORY, RESTIC_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HC_PING_URL
@@ -14,6 +15,8 @@
 #   HC_PING_URL vazia desliga os avisos (usado no teste de integração)
 #   PAPERCLIP_DADOS pasta de dados do Paperclip (padrão: /opt/asttra/paperclip/dados). Se ela não
 #               existir (servidor sem Paperclip), o backup segue só com o banco.
+#   HERMES_DADOS pasta de dados do Hermes (padrão: /opt/asttra/hermes/dados). Mesma regra: se não
+#               existir, é pulada. Os segredos do Hermes ficam fora dela, em /opt/asttra/hermes/.env.
 set -euo pipefail
 
 DIR_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,6 +34,7 @@ fi
 : "${RESTIC_PASSWORD:?defina RESTIC_PASSWORD no backup.env}"
 HC_PING_URL="${HC_PING_URL:-}"
 PAPERCLIP_DADOS="${PAPERCLIP_DADOS:-/opt/asttra/paperclip/dados}"
+HERMES_DADOS="${HERMES_DADOS:-/opt/asttra/hermes/dados}"
 
 # Avisa o Healthchecks.io. Uma falha no aviso não derruba o backup.
 avisar() {
@@ -91,8 +95,14 @@ if [[ -d "$PAPERCLIP_DADOS" ]]; then
 else
   echo "   - pasta de dados do Paperclip não existe ($PAPERCLIP_DADOS): pulada."
 fi
+if [[ -d "$HERMES_DADOS" ]]; then
+  echo "   - pasta de dados do Hermes ($HERMES_DADOS)"
+  restic backup --host asttra-banco --tag hermes "$HERMES_DADOS"
+else
+  echo "   - pasta de dados do Hermes não existe ($HERMES_DADOS): pulada."
+fi
 # A retenção agrupa por host e tag, e não pelo caminho (o padrão do restic), porque o diretório
-# temporário muda a cada execução. Cada tag (banco e paperclip) guarda 7 diárias e 4 semanais.
+# temporário muda a cada execução. Cada tag (banco, paperclip e hermes) guarda 7 diárias e 4 semanais.
 restic forget --host asttra-banco --group-by host,tags \
   --keep-daily 7 --keep-weekly 4 --prune
 

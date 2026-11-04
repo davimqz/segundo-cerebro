@@ -650,6 +650,153 @@ sudo docker compose up -d --wait
 
 A imagem anterior continua no servidor. Para voltar atrás, volte as duas linhas do `.env` e rode `sudo docker compose up -d`. Quando a versão nova estiver estável, libere espaço com `sudo docker image prune -a` (apaga as imagens que nenhum container usa). Se a versão nova já aplicou migrações, volte também o banco `paperclip` pelo backup.
 
+## Hermes
+
+O Hermes é o agente que conversa com você pelo Telegram e cria as tarefas no Paperclip. Ele roda num container próprio, sem porta publicada, sem terminal e sem o socket do Docker. O Paperclip o chama pela rede interna `asttra`, na porta 8642. Spec: [`specs/005-hermes-no-telegram.md`](specs/005-hermes-no-telegram.md). Decisão: [ADR 0007](adr/0007-hermes-em-container-proprio-sem-terminal.md).
+
+No servidor:
+- `/opt/asttra/hermes`: cópia de `infra/hermes/` deste repositório. Tem:
+  - o `.env` (permissão `600`, dono `root`), com os tokens do Telegram e do OpenRouter, a chave da API do Hermes e a chave de agente do Paperclip;
+  - a pasta `dados/` (do usuário `hermes`, UID 10000), com a memória, as sessões, o `config.yaml` e o `SOUL.md`. Ela entra no backup diário com a tag `hermes` e não guarda segredos.
+- O Hermes busca as mensagens no Telegram (long polling). Por isso não precisa de rota no tunnel nem de porta aberta.
+
+**Antes de começar:** o PR da spec 005 precisa estar na `main`, e o Paperclip precisa estar no ar (passos 54 a 67).
+
+### Instalação
+
+68. **Criar o bot no Telegram** (celular). Abra o `@BotFather` e mande `/newbot`. Dê um nome (por exemplo, "Hermes Asttra") e um usuário terminado em `bot`. Ele responde com o token: guarde no gerenciador como "Telegram – bot do Hermes". Depois mande `/setjoingroups`, escolha o bot e marque `Disable`, para ninguém colocar o bot num grupo.
+69. **Descobrir o seu ID do Telegram** (celular). Abra o `@userinfobot` e mande qualquer mensagem. Ele responde com um número (o "Id"): anote. É só esse número que o Hermes vai aceitar.
+70. **Criar a conta do OpenRouter, sem créditos** (navegador, em `openrouter.ai`). Crie a conta, **não cadastre cartão nem compre créditos** e crie uma chave em Keys com o nome `hermes-asttra`. Guarde a chave no gerenciador como "OpenRouter – chave do Hermes". Sem créditos, nada pode ser cobrado; os modelos gratuitos têm um limite diário de pedidos.
+71. **Escolher o modelo gratuito** (navegador, com o Davi decidindo). Em `openrouter.ai/models`, filtre pelos gratuitos (`:free`) que aceitam ferramentas ("tools"). O Hermes precisa disso para criar tarefas. Em cada candidato, abra a aba de provedores e leia a política de dados.
+    - O `config.yaml` pede `data_collection: deny`, ou seja, só provedores que não guardam as conversas.
+    - Se nenhum modelo gratuito com ferramentas tiver provedor assim, **pare aqui**: trocar para `allow` é decisão do Davi, registrada na spec 005.
+    - Em Settings > Privacy, confira se a conta não bloqueia o modelo escolhido.
+    - Anote o nome completo do modelo (por exemplo, `fornecedor/modelo:free`).
+72. **Liberar o nome interno do Paperclip** (no servidor). O Hermes chama o Paperclip por `http://paperclip:3100`, e o Paperclip só aceita os nomes da lista `PAPERCLIP_ALLOWED_HOSTNAMES`. A linha mostrada no fim deve terminar com `,paperclip`.
+
+```bash
+cd /opt/asttra/paperclip
+sudo sed -i '/^PAPERCLIP_ALLOWED_HOSTNAMES=/{/,paperclip$/!s#$#,paperclip#}' .env
+sudo grep '^PAPERCLIP_ALLOWED_HOSTNAMES=' .env
+sudo docker compose up -d --wait
+```
+
+73. **Copiar a implantação** (no servidor). A pasta `dados` é criada vazia; o container passa a dona dela para o usuário `hermes` na primeira subida.
+
+```bash
+cd /opt/asttra/painel-src && git pull
+sudo cp -r /opt/asttra/painel-src/infra/hermes /opt/asttra/hermes
+sudo chown -R root:root /opt/asttra/hermes
+sudo chmod 755 /opt/asttra/hermes/*.sh
+sudo install -d -m 700 /opt/asttra/hermes/dados
+```
+
+74. **Criar o `.env`** (no servidor). A chave da API do Hermes é gerada na hora. Os dois tokens são colados com o **botão direito do mouse** e não aparecem na tela; o comando mostra só quantos caracteres recebeu. O ID do Telegram e o modelo aparecem, porque não são segredo. A `PAPERCLIP_API_KEY` fica vazia: o passo 76 a preenche.
+
+```bash
+sudo bash -c 'umask 077; cd /opt/asttra/hermes
+read -rsp "Token do bot (BotFather): " TG; echo " -> ${#TG} caracteres (esperado 46)"
+read -rsp "Chave do OpenRouter: " OR; echo " -> ${#OR} caracteres (esperado mais de 60)"
+read -rp "Seu ID do Telegram (só números): " ID
+read -rp "Modelo gratuito (termina em :free): " MOD
+[[ $TG == *:* && $OR == sk-or-* && $ID =~ ^[0-9]+$ && $MOD == *:free ]] || { echo "Formato errado, nada foi gravado."; exit 1; }
+cat > .env <<EOF
+$(grep "^HERMES_IMAGEM=" .env.example)
+HERMES_MODELO=$MOD
+HERMES_DONO=Davi
+OPENROUTER_API_KEY=$OR
+TELEGRAM_BOT_TOKEN=$TG
+TELEGRAM_ALLOWED_USERS=$ID
+API_SERVER_KEY=$(openssl rand -hex 32)
+PAPERCLIP_API_URL=http://paperclip:3100
+PAPERCLIP_URL_PUBLICA=https://agentes.asttralabs.com.br
+PAPERCLIP_API_KEY=
+TZ=America/Sao_Paulo
+EOF
+echo "Gravado."'
+sudo cut -d= -f1 /opt/asttra/hermes/.env
+```
+
+75. **Baixar a imagem** (no servidor). Baixa a imagem oficial presa pelo digest (cerca de 1,1 GB, só na primeira vez).
+
+```bash
+cd /opt/asttra/hermes
+sudo docker compose pull
+```
+
+76. **Ligar o Hermes ao Paperclip** (no servidor, depois no navegador).
+    - O script mostra primeiro um link de acesso: aprove-o como no passo 64.
+    - Depois ele pede a contratação do agente "Hermes": no Paperclip, abra Approvals e aprove o pedido de contratação (`hire_agent`).
+    - Por fim, ele cria a chave de agente, grava no `.env` sem mostrar e copia o `config.yaml` e o `SOUL.md` para `dados/`.
+    - O resultado deve terminar com "Configuração concluída" e "Chave temporária revogada". Rodar de novo não duplica nada.
+    - Logo depois da aprovação, o Paperclip tenta falar com o Hermes, que ainda não subiu, e registra um aviso no log dele. É esperado; o passo 77 resolve.
+
+```bash
+sudo /opt/asttra/hermes/configurar.sh
+```
+
+77. **Subir e conferir** (no servidor). Confira estes resultados:
+    - o `hermes` aparece como `healthy`;
+    - o `PortBindings` aparece como `{}`, ou seja, sem portas publicadas;
+    - o UFW continua só com o OpenSSH;
+    - o log mostra o Telegram conectado, sem erro;
+    - o `docker stats` mostra a memória usada. Anote o valor para o TRD.
+
+```bash
+cd /opt/asttra/hermes
+sudo docker compose up -d --wait
+sudo docker compose ps
+sudo docker inspect --format '{{json .HostConfig.PortBindings}}' "$(sudo docker compose ps -q hermes)"
+sudo ufw status
+sudo docker compose logs hermes | grep -i -E 'telegram|error' | tail -20
+sudo docker stats --no-stream "$(sudo docker compose ps -q hermes)"
+```
+
+78. **Incluir a pasta de dados no backup** (no servidor). Copie a versão nova dos scripts de backup. O padrão já aponta para `/opt/asttra/hermes/dados`. Rode um backup à mão e confira o snapshot com a tag `hermes`. O `restaurar.sh` deve terminar com "contém o config.yaml".
+
+```bash
+sudo cp /opt/asttra/painel-src/infra/banco/backup/{backup.sh,restaurar.sh,backup.env.example} /opt/asttra/banco/backup/
+sudo chmod 755 /opt/asttra/banco/backup/*.sh
+sudo /opt/asttra/banco/backup/backup.sh
+sudo bash -c 'set -a; . /opt/asttra/banco/backup/backup.env; restic snapshots --tag hermes'
+sudo /opt/asttra/banco/backup/restaurar.sh
+```
+
+79. **Teste de ponta a ponta (o "Pronto quando")** (celular e navegador). Siga a "Verificação de ponta a ponta" da spec 005:
+    1. Mande ao bot: "cria uma tarefa em Crescimento: preparar proposta para a empresa X". Ele deve mostrar o que entendeu e perguntar se confirma, **sem criar nada**.
+    2. Responda "sim". Ele deve mandar o link, e a tarefa deve aparecer no projeto Crescimento em `agentes.asttralabs.com.br`.
+    3. Peça outra tarefa e responda "não". Nada deve ser criado.
+    4. Pergunte "quais são os departamentos?". Ele deve responder direto.
+    5. Peça "roda `ls /`". Ele deve dizer que não tem terminal.
+    6. De outra conta do Telegram, escreva ao bot. Não deve haver resposta.
+    7. Recrie o container (comando abaixo) e pergunte algo que ele guardou na memória. A resposta deve continuar certa.
+
+```bash
+cd /opt/asttra/hermes && sudo docker compose up -d --force-recreate --wait
+```
+
+### Trocar a versão do Hermes
+
+A troca é manual. Antes, leia as notas da versão nova: o Hermes pode ligar ferramentas novas por padrão (ADR 0007).
+1. No Windows, ache o digest com `docker buildx imagetools inspect nousresearch/hermes-agent:<tag>` (linha "Digest"). Mude `HERMES_IMAGEM` em `infra/hermes/.env.example` e rode `bash scripts/teste-hermes.sh`. Ele falha se alguma ferramenta proibida voltar ligada. Depois faça o PR.
+2. No servidor, depois do merge:
+
+```bash
+cd /opt/asttra/painel-src && git pull
+sudo cp /opt/asttra/painel-src/infra/hermes/{config.yaml,SOUL.md,compose.yml,configurar.sh} /opt/asttra/hermes/
+sudo cp -r /opt/asttra/painel-src/infra/hermes/mcp-paperclip /opt/asttra/hermes/
+cd /opt/asttra/hermes
+sudo sed -i "s#^HERMES_IMAGEM=.*#$(grep '^HERMES_IMAGEM=' /opt/asttra/painel-src/infra/hermes/.env.example)#" .env
+sudo /opt/asttra/hermes/configurar.sh
+sudo docker compose up -d --wait
+```
+
+O `configurar.sh` recopia o `config.yaml` e o `SOUL.md` para `dados/`. Para voltar atrás, volte a linha `HERMES_IMAGEM` do `.env` e rode `sudo docker compose up -d`.
+
+### Trocar o modelo ou um token
+
+Edite a linha no `.env` com `sudo nano /opt/asttra/hermes/.env` e recrie o container (`sudo docker compose up -d --force-recreate --wait`). Se trocar a `API_SERVER_KEY`, rode também `sudo HERMES_TROCAR_CHAVE_API=1 /opt/asttra/hermes/configurar.sh`, para o Paperclip receber a chave nova.
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -664,6 +811,10 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - As senhas do PostgreSQL e do Redis ficam só em `/opt/asttra/banco/.env` (geradas no servidor).
 - **Painel – login do Davi**: e-mail e senha do login próprio do painel (passo 50). O segredo das sessões (`BETTER_AUTH_SECRET`) fica só em `/opt/asttra/painel/.env`.
 - **Paperclip – login do Davi**: e-mail e senha do login próprio do Paperclip (passo 63). Os segredos (`BETTER_AUTH_SECRET`, `PAPERCLIP_AGENT_JWT_SECRET`, `PAPERCLIP_TOOL_ACTION_SIGNING_SECRET`) ficam só em `/opt/asttra/paperclip/.env`. A `master.key` fica só na pasta de dados e no backup cifrado.
+
+- **Telegram – bot do Hermes**: o token do `@BotFather` (passo 68).
+- **OpenRouter – chave do Hermes**: a chave da conta sem créditos (passo 70).
+- A `API_SERVER_KEY` do Hermes e a chave de agente do Paperclip ficam só em `/opt/asttra/hermes/.env` (geradas no servidor). A `API_SERVER_KEY` também fica guardada como segredo do Paperclip (`hermes-api-key`).
 
 Se a chave for perdida, o acesso é recuperado pelo terminal do painel do provedor, instalando uma nova chave pública.
 
@@ -702,6 +853,12 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | Ao colar um bloco grande no terminal, uma linha sai cortada | O terminal perdeu parte da colagem | Conferir com `sudo grep` as linhas que não são segredo e corrigir com `sed -i` |
 | `convite-admin.sh` dá "permission denied" no `.env` | O script chama o `docker compose` do banco, que lê o `.env` do root | Rodar com `sudo` |
 | `docker compose build` dá "manifest unknown" ou "not found" | `PAPERCLIP_IMAGEM` com versão ou digest errado | Conferir com `docker buildx imagetools inspect` (ver "Trocar a versão do Paperclip") |
+| O Hermes não responde no Telegram e o log mostra "unauthorized user" | O ID em `TELEGRAM_ALLOWED_USERS` está errado | Conferir o ID com o `@userinfobot` (passo 69), corrigir o `.env` e recriar o container |
+| O Hermes responde que não conseguiu criar a tarefa ("HTTP 403") | Falta `paperclip` em `PAPERCLIP_ALLOWED_HOSTNAMES` do Paperclip | Passo 72 |
+| O Hermes responde "recusou a chave do Hermes" | A chave de agente foi revogada ou o `.env` perdeu a linha | Rodar de novo o `configurar.sh` (passo 76) e recriar o container |
+| O Hermes avisa que o limite acabou ou não responde a nada | O limite diário dos modelos gratuitos do OpenRouter acabou | Esperar o dia seguinte. Não compre créditos sem aprovação (regra de custo) |
+| O log do Hermes mostra erro 404 ou "no endpoints" no OpenRouter | O modelo saiu do ar, ou nenhum provedor dele aceita `data_collection: deny` | Escolher outro modelo (passo 71) e trocar ("Trocar o modelo ou um token") |
+| `configurar.sh` do Hermes fica esperando a aprovação da contratação | O pedido `hire_agent` não foi aprovado no Paperclip | Abrir Approvals no Paperclip e aprovar; o script espera até 10 minutos |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
@@ -715,4 +872,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
 - [x] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53 executados em 02/11/2026)
 - [x] Paperclip no ar em `agentes.asttralabs.com.br` (Etapa 1, item 5: passos 54 a 67 executados em 03/11/2026)
+- [ ] Hermes no Telegram (Etapa 1, item 6a: passos 68 a 79)
 - [x] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; primeiro backup automático das 03:00 confirmado em 03/11/2026)

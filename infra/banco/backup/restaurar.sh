@@ -2,7 +2,8 @@
 # Teste de restauração: baixa um snapshot do restic e restaura cada banco, um de cada vez,
 # num banco separado (restauracao_teste). Compara a contagem de linhas por tabela com o
 # original. O banco de produção só é lido, nunca alterado. Também confere que o último snapshot
-# da pasta de dados do Paperclip (tag paperclip) contém a master.key.
+# da pasta de dados do Paperclip (tag paperclip) contém a master.key e que o da pasta do Hermes
+# (tag hermes) contém o config.yaml.
 #
 # Uso: sudo /opt/asttra/banco/backup/restaurar.sh [ID_DO_SNAPSHOT]   (padrão: o último)
 #
@@ -26,6 +27,7 @@ fi
 : "${RESTIC_REPOSITORY:?defina RESTIC_REPOSITORY no backup.env}"
 : "${RESTIC_PASSWORD:?defina RESTIC_PASSWORD no backup.env}"
 PAPERCLIP_DADOS="${PAPERCLIP_DADOS:-/opt/asttra/paperclip/dados}"
+HERMES_DADOS="${HERMES_DADOS:-/opt/asttra/hermes/dados}"
 
 pg() {
   docker compose --project-directory "$BANCO_DIR" exec -T postgres "$@"
@@ -112,6 +114,25 @@ elif lista_arquivos="$(restic ls latest --host asttra-banco --tag paperclip)" &&
   echo "   Último snapshot com a tag paperclip contém a master.key."
 else
   echo "   O último snapshot com a tag paperclip não contém a master.key." >&2
+  diferencas=1
+fi
+
+# Pasta de dados do Hermes: mesma conferência, com o config.yaml.
+echo "== Pasta de dados do Hermes"
+lista_snapshots="$(restic snapshots --host asttra-banco --tag hermes --json)"
+hermes_snapshots="$(grep -o '"short_id"' <<<"$lista_snapshots" | wc -l || true)"
+if [[ "$hermes_snapshots" -eq 0 ]]; then
+  if [[ -d "$HERMES_DADOS" ]]; then
+    echo "   A pasta $HERMES_DADOS existe, mas não há snapshot com a tag hermes." >&2
+    diferencas=1
+  else
+    echo "   Sem Hermes neste servidor: pulada."
+  fi
+elif lista_arquivos="$(restic ls latest --host asttra-banco --tag hermes)" &&
+  grep -q '/config\.yaml$' <<<"$lista_arquivos"; then
+  echo "   Último snapshot com a tag hermes contém o config.yaml."
+else
+  echo "   O último snapshot com a tag hermes não contém o config.yaml." >&2
   diferencas=1
 fi
 

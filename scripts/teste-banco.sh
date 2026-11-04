@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Teste de integração de infra/banco: sobe o compose com senhas de teste, confere o isolamento
 # dos bancos e a senha do Redis, roda backup.sh num repositório restic local (sem R2 e sem
-# Healthchecks.io), com uma pasta de dados do Paperclip de teste (master.key falsa), roda
+# Healthchecks.io), com pastas de dados de teste do Paperclip (master.key falsa) e do Hermes, roda
 # restaurar.sh e confere que uma falha termina com erro e limpa os dumps.
 #
 # Precisa de: docker (com compose), restic e a porta 127.0.0.1:5432 livre.
@@ -108,10 +108,14 @@ echo "   ok"
 echo "== backup.sh num repositório restic local"
 export RESTIC_REPOSITORY="$TMP/restic" RESTIC_PASSWORD="senha-de-teste" HC_PING_URL=""
 export BACKUP_ENV="$TMP/sem-arquivo.env"
-# Pasta de dados do Paperclip de teste, com uma master.key falsa.
+# Pastas de dados do Paperclip (com uma master.key falsa) e do Hermes de teste.
 export PAPERCLIP_DADOS="$TMP/paperclip-dados"
 mkdir -p "$PAPERCLIP_DADOS/instances/default/secrets"
 head -c 32 /dev/urandom >"$PAPERCLIP_DADOS/instances/default/secrets/master.key"
+# Pasta de dados do Hermes de teste, com um config.yaml.
+export HERMES_DADOS="$TMP/hermes-dados"
+mkdir -p "$HERMES_DADOS/memories"
+echo "model: {}" >"$HERMES_DADOS/config.yaml"
 restic init --quiet >/dev/null
 bash "$TMP/banco/backup/backup.sh"
 # A saída do restic vai para uma variável antes do grep: com pipefail, um grep -q que fecha o pipe
@@ -128,14 +132,17 @@ tem_no_snapshot() {
 }
 [[ "$(snapshots banco)" -eq 1 ]] || falhar "deveria haver 1 snapshot com a tag banco"
 [[ "$(snapshots paperclip)" -eq 1 ]] || falhar "deveria haver 1 snapshot com a tag paperclip"
+[[ "$(snapshots hermes)" -eq 1 ]] || falhar "deveria haver 1 snapshot com a tag hermes"
 tem_no_snapshot banco 'painel.dump' || falhar "snapshot sem painel.dump"
 tem_no_snapshot banco 'globals.sql' || falhar "snapshot sem globals.sql"
 tem_no_snapshot paperclip '/secrets/master\.key$' || falhar "snapshot paperclip sem a master.key"
+tem_no_snapshot hermes '/config\.yaml$' || falhar "snapshot hermes sem o config.yaml"
 
 echo "== restaurar.sh"
 bash "$TMP/banco/backup/restaurar.sh" | tee "$TMP/restauracao.log"
 grep -q "contagens iguais em todos os bancos" "$TMP/restauracao.log" || falhar "restauração sem contagens iguais"
 grep -q "contém a master.key" "$TMP/restauracao.log" || falhar "restaurar.sh não conferiu a master.key"
+grep -q "contém o config.yaml" "$TMP/restauracao.log" || falhar "restaurar.sh não conferiu a pasta do Hermes"
 dc exec -T postgres psql -U postgres -d postgres -Atc \
   "SELECT count(*) FROM pg_database WHERE datname = 'restauracao_teste'" | grep -qx 0 ||
   falhar "restauracao_teste deveria ter sido apagado"
@@ -160,10 +167,14 @@ PAPERCLIP_SNAPS="$(snapshots paperclip)"
   falhar "a retenção deixou $PAPERCLIP_SNAPS snapshots com a tag paperclip (esperado 1 ou 2)"
 echo "   ok ($total snapshots do banco)"
 
-echo "== Servidor sem Paperclip: backup segue só com o banco"
+echo "== Servidor sem Paperclip e sem Hermes: backup segue só com o banco"
+HERMES_SNAPS="$(snapshots hermes)"
+export HERMES_DADOS_TESTE="$HERMES_DADOS" HERMES_DADOS="$TMP/nao-existe"
 PAPERCLIP_DADOS="$TMP/nao-existe" bash "$TMP/banco/backup/backup.sh" >"$TMP/sem-paperclip.log"
 grep -q "pasta de dados do Paperclip não existe" "$TMP/sem-paperclip.log" || falhar "backup.sh não avisou que pulou a pasta"
 [[ "$(snapshots paperclip)" -eq "$PAPERCLIP_SNAPS" ]] || falhar "backup sem a pasta não deveria criar snapshot paperclip"
+grep -q "pasta de dados do Hermes não existe" "$TMP/sem-paperclip.log" || falhar "backup.sh não avisou que pulou a pasta do Hermes"
+[[ "$(snapshots hermes)" -eq "$HERMES_SNAPS" ]] || falhar "backup sem a pasta não deveria criar snapshot hermes"
 # restaurar.sh num repositório que nunca teve a tag paperclip.
 REPO_PRINCIPAL="$RESTIC_REPOSITORY"
 export RESTIC_REPOSITORY="$TMP/restic-sem-paperclip"
@@ -173,9 +184,14 @@ PAPERCLIP_DADOS="$TMP/nao-existe" bash "$TMP/banco/backup/restaurar.sh" >"$TMP/r
   { cat "$TMP/restaura-sem-paperclip.log" >&2; falhar "restaurar.sh sem Paperclip deveria terminar com sucesso"; }
 grep -q "Sem Paperclip neste servidor: pulada" "$TMP/restaura-sem-paperclip.log" ||
   falhar "restaurar.sh não avisou que pulou a pasta do Paperclip"
+grep -q "Sem Hermes neste servidor: pulada" "$TMP/restaura-sem-paperclip.log" ||
+  falhar "restaurar.sh não avisou que pulou a pasta do Hermes"
 # Com a pasta existindo e nenhum snapshot dela, restaurar.sh deve acusar.
 if bash "$TMP/banco/backup/restaurar.sh" >/dev/null 2>&1; then
   falhar "restaurar.sh deveria falhar com a pasta do Paperclip sem snapshot"
+fi
+if HERMES_DADOS="$HERMES_DADOS_TESTE" PAPERCLIP_DADOS="$TMP/nao-existe"   bash "$TMP/banco/backup/restaurar.sh" >/dev/null 2>&1; then
+  falhar "restaurar.sh deveria falhar com a pasta do Hermes sem snapshot"
 fi
 export RESTIC_REPOSITORY="$REPO_PRINCIPAL"
 echo "   ok"

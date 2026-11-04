@@ -14,3 +14,6 @@ CLAUDE.local.md
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Cache do Python (MCP do Hermes)
+__pycache__/

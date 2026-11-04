@@ -104,6 +104,7 @@ Ideias de infraestrutura (da spec 001):
 - **Mover o Cloudflare Tunnel** de `~/infra/cloudflared` para `/opt/asttra/`, junto com os outros serviços.
 
 Ideias do Hermes (da spec 005), para Davi decidir:
+- **Pesquisa na web:** a imagem do Hermes não tem busca gratuita embutida, e a leitura de páginas alcançaria a rede interna do Docker. A ferramenta `web` ficou desligada. Para ligar, seria preciso uma chave de busca (por exemplo, o plano gratuito do Brave Search) e um bloqueio da rede interna.
 - **Terminal em sandbox:** deixar o Hermes rodar comandos num container descartável, quando alguma tarefa precisar (talvez no item 9). Exige decidir como dar acesso ao Docker sem dar poder de root (proxy do socket ou outra saída), com ADR.
 
 Ideias do Paperclip (da spec 004), para Davi decidir:
