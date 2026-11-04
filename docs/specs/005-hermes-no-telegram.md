@@ -21,6 +21,7 @@ Davi conversa com o Hermes por um bot do Telegram e pede tarefas em linguagem na
 - **Porta:** o `hermes_gateway` chama a API do Hermes na 8642. O painel do Hermes (9119) fica desligado.
 - **Ferramentas do Paperclip (1A):** um MCP próprio e mínimo, com a chave de agente do Hermes. O MCP oficial do Paperclip fica de fora, porque entra com o login do Davi e com todos os poderes dele.
 - **Arquivos (2A):** a ferramenta `file` (ler e escrever arquivos) também fica desligada.
+- **Modelo e dados (1A, na implantação):** o modelo é o `nvidia/nemotron-3-ultra-550b-a55b:free`. Ele aceita ferramentas e foi o 4º de 237 modelos em seguir instruções (IFBench). O endpoint gratuito só é servido pela NVIDIA, que registra as conversas para melhorar os produtos dela. Por isso, `data_collection` passa a `allow`. Regra de uso: não mandar ao Hermes dados pessoais nem informação confidencial de clientes. A regra está no `SOUL.md`, e o Hermes avisa quando receber esse tipo de dado.
 
 ## Critérios de aceite
 **Instalação e rede**
@@ -76,7 +77,7 @@ Davi conversa com o Hermes por um bot do Telegram e pede tarefas em linguagem na
 - `infra/hermes/compose.yml` (novo): o serviço `hermes`, com a imagem `${HERMES_IMAGEM}`, o comando `gateway run`, `env_file: .env`, o volume `./dados:/opt/data`, a rede `asttra`, nenhuma porta, `mem_limit` de 1,5 GB (a medir), `pids_limit`, `no-new-privileges`, `healthcheck` (`/health` da API) e `restart: unless-stopped`. Sem `user:`, porque a imagem recusa um UID fixo e troca sozinha para o usuário `hermes`.
 - `dados/.env` vazio, criado pelo `configurar.sh`: o Hermes carrega esse arquivo por cima das variáveis do container, e a imagem copiaria o exemplo dela se ele não existisse.
 - `infra/hermes/.env.example` (novo): `HERMES_IMAGEM`, `HERMES_MODELO`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_USERS`, `OPENROUTER_API_KEY`, `API_SERVER_ENABLED=true`, `API_SERVER_HOST=0.0.0.0`, `API_SERVER_PORT=8642`, `API_SERVER_KEY` (`openssl rand -hex 32`), `PAPERCLIP_API_URL=http://paperclip:3100` e `PAPERCLIP_API_KEY` (gravada pelo `configurar.sh`). Os segredos ficam vazios.
-- `infra/hermes/config.yaml` (novo, sem segredos): `model.provider: openrouter` e `model.default` (o modelo), `fallback_providers: []`, `platform_toolsets` de `telegram` e `api_server` com a lista permitida, `agent.disabled_toolsets` com as ferramentas proibidas, `approvals.mode: manual` como defesa extra, `provider_routing.data_collection: deny` se houver modelo `:free` que aceite, e `mcp_servers.paperclip`. Copiado para `dados/` pelo `configurar.sh`.
+- `infra/hermes/config.yaml` (novo, sem segredos): `model.provider: openrouter` e `model.default` (o modelo), `fallback_providers: []`, `platform_toolsets` de `telegram` e `api_server` com a lista permitida, `agent.disabled_toolsets` com as ferramentas proibidas, `approvals.mode: manual` como defesa extra, `provider_routing.data_collection: allow` (decisão 1A, por causa do modelo escolhido), e `mcp_servers.paperclip`. Copiado para `dados/` pelo `configurar.sh`.
 - `infra/hermes/SOUL.md` (novo): as instruções do Hermes, com a regra da confirmação, a lista de departamentos e a regra base de aprovação (de `infra/paperclip/regra-de-aprovacao.md`).
 - **`infra/hermes/mcp-paperclip/` (novo):** servidor MCP mínimo, ligado em `mcp_servers`, com só 3 ferramentas: `listar_departamentos`, `criar_tarefa(departamento, titulo, descricao)` e `ver_tarefa(id)`. Usa a API REST do Paperclip com a chave de agente (`GET /api/companies/{id}/projects`, `POST /api/companies/{id}/issues` e `GET /api/issues/{id}`). O MCP oficial do Paperclip não serve: aceita só o login OAuth de uma pessoa, aprovado no navegador.
 - `infra/hermes/configurar.sh` (novo, idempotente): cria o agente Hermes no Paperclip (`hermes_gateway`, sem heartbeat), cria a chave de agente, grava-a no `.env` e copia o `config.yaml` e o `SOUL.md` para `dados/`. Reaproveita `infra/paperclip/lib.sh`, inclusive a chave de board temporária revogada no fim.
@@ -88,7 +89,6 @@ Davi conversa com o Hermes por um bot do Telegram e pede tarefas em linguagem na
 - `docs/02-trd.md`, `docs/06-build-plan.md` e `CLAUDE.md`: "Hermes isolado", os dois bots e a infraestrutura do Hermes.
 
 ## Perguntas em aberto
-- **Modelo e termos de dados:** qual modelo `:free` usar, e se sobra algum com `data_collection: deny`. A escolha é feita na implantação, e quem decide é o Davi.
 - **Endereço do gateway:** a doc do Paperclip diz que o `apiBaseUrl` é "mapeado para `/api`". Conferir no teste se `http://hermes:8642` funciona direto.
 - **Heartbeat:** a doc do `hermes_gateway` não mostra como desligar o acordar agendado. Conferir na configuração do agente no Paperclip.
 - **Pesquisa na web:** conferir se a ferramenta `web` funciona sem chave paga. Se não funcionar, o Hermes fica sem pesquisa neste item, e a ideia vai para o Build Plan.
@@ -98,6 +98,7 @@ Davi conversa com o Hermes por um bot do Telegram e pede tarefas em linguagem na
 - **Porta:** 8642, a API do Hermes, que tem `/v1/runs`. A 9119 é o painel visual.
 - **Nomes das ferramentas:** `terminal`, `code_execution`, `browser`, `computer_use`, `file`, `delegation`, `cronjob` e `image_gen`, desligadas por `platform_toolsets` e `agent.disabled_toolsets`.
 - **MCP oficial do Paperclip:** existe e é gratuito, mas aceita só o login OAuth de uma pessoa. Davi escolheu o MCP próprio (1A).
+- **Modelo e termos de dados:** Nemotron 3 Ultra gratuito, com `data_collection: allow` e a regra de uso (ver "Decisões").
 
 ## Plano
 1. **Pesquisa na versão fixada:** feita em 2026-11-04 (ver Perguntas em aberto).

@@ -110,7 +110,9 @@ O Hermes conversa com Davi; o n8n faz as integrações com serviços externos; o
 
 - **Modelos gratuitos** pelo OpenRouter, configurados no Hermes (`HERMES_MODELO`), numa conta sem créditos. Há limite de requisições por dia. As tarefas auxiliares do Hermes usam o mesmo modelo (`auxiliary.free_only`).
 - **Sem modelo pago de reserva por enquanto.** Quando o limite diário for atingido, o painel mostra um aviso, e Davi decide o que fazer.
-- **Regra de dados:** conteúdos sensíveis de clientes não devem ser enviados a modelos gratuitos cujos termos permitam usar os dados para treinamento. A lista de modelos permitidos será definida na implantação, após ler os termos de cada um.
+- **Regra de dados:** conteúdos sensíveis de clientes não devem ser enviados a modelos gratuitos cujos termos permitam usar os dados para treinamento.
+  - O Hermes usa o `nvidia/nemotron-3-ultra-550b-a55b:free` (spec 005). A NVIDIA registra as conversas do endpoint gratuito, então o `config.yaml` usa `data_collection: allow`.
+  - Por isso, dados pessoais e informação confidencial de clientes não passam pelo Hermes. O `SOUL.md` manda o Hermes avisar quando receber esse tipo de dado.
 
 ## Decisão do CRM
 

@@ -18,10 +18,12 @@ auxiliary:
   free_only: true
   openrouter_model: "${HERMES_MODELO}"
 
-# Só provedores que não guardam os dados das conversas. Se o modelo escolhido não tiver nenhum
-# provedor assim, troque para "allow" com a aprovação do Davi (ver playbook, capítulo Hermes).
+# Decisão do Davi (2026-11-04, spec 005): o modelo gratuito escolhido (Nemotron 3 Ultra) só é
+# servido pela NVIDIA, que registra as conversas do endpoint gratuito. Com "deny" ele não
+# funcionaria. Regra de uso: nada de dados pessoais nem informação confidencial de clientes no
+# Hermes (está no SOUL.md). Ao trocar de modelo, prefira um provedor que não guarde os dados.
 provider_routing:
-  data_collection: deny
+  data_collection: allow
 
 # Ferramentas, camada 1: a lista permitida em cada plataforma. "paperclip" é o MCP abaixo.
 # api_server é a porta que o Paperclip chama (hermes_gateway); o preset dela vem com terminal.
