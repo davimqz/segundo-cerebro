@@ -58,8 +58,13 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
      - backup com a tag `paperclip` e restauração que confirma a `master.key`;
      - pedido `request_board_approval` de teste aprovado pela tela, com a chave temporária revogada;
      - dados mantidos depois de recriar o container.
-6. **Hermes no Telegram:** com modelos gratuitos, execução isolada e ligado ao Paperclip.
-   - Pronto quando: Davi pede uma tarefa no Telegram, ela aparece no Paperclip e a aprovação volta pelo Telegram.
+6. **Hermes no Telegram:** com modelos gratuitos, execução isolada e ligado ao Paperclip. Dividido em duas partes por Davi em 2026-11-03.
+   - **6a. Hermes no Telegram:** container próprio sem terminal, modelo `:free` do OpenRouter, confirmação antes de agir e tarefas criadas no Paperclip pelo `hermes_gateway`.
+     - Pronto quando: Davi pede uma tarefa no Telegram, o Hermes confirma o que entendeu e, depois do "sim", a tarefa aparece no Paperclip.
+     - Spec: [005](specs/005-hermes-no-telegram.md).
+   - **6b. Aprovações no painel e no Telegram:** tela Aprovações do painel e um segundo bot, do painel, com os botões Aprovar/Recusar. O primeiro "sim" ou "não" vale, e o outro lugar mostra quem decidiu. A decisão fica registrada em Atividades. O poder de aprovar fica no painel, nunca no Hermes.
+     - Pronto quando: um pedido de aprovação aparece no painel e no Telegram ao mesmo tempo; Davi aprova num deles e o outro se atualiza.
+     - Spec: 006, a escrever.
 7. **Ponte do Hermes com o painel (servidor MCP):** o Hermes consulta e age no painel, registrando tudo em Atividades.
    - Pronto quando: um pedido no Telegram cria um registro no painel.
 8. **n8n:** instalado, com `n8n-mcp`, ligado ao Gmail, Google Agenda e Google Drive.
@@ -97,6 +102,9 @@ Ideias registradas, só quando Davi pedir: resumo diário, revisão semanal e fo
 Ideias de infraestrutura (da spec 001):
 - **Bucket Lock no R2:** impedir que os backups sejam apagados antes do prazo, mesmo com a chave do R2 vazada.
 - **Mover o Cloudflare Tunnel** de `~/infra/cloudflared` para `/opt/asttra/`, junto com os outros serviços.
+
+Ideias do Hermes (da spec 005), para Davi decidir:
+- **Terminal em sandbox:** deixar o Hermes rodar comandos num container descartável, quando alguma tarefa precisar (talvez no item 9). Exige decidir como dar acesso ao Docker sem dar poder de root (proxy do socket ou outra saída), com ADR.
 
 Ideias do Paperclip (da spec 004), para Davi decidir:
 - **Backup interno do Paperclip:** ele copia o próprio banco a cada hora para a pasta de dados, e isso também entra no restic. Pode ser desligado com `PAPERCLIP_DB_BACKUP_ENABLED=false`.
