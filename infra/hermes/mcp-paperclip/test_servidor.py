@@ -139,6 +139,12 @@ class TesteMcpPaperclip(unittest.TestCase):
         self.assertTrue(erro)
         self.assertIn("404", texto)
 
+    def test_identificador_que_sai_de_issues_e_recusado(self):
+        for ident in ["../agents/me", "AST-1/../../agents/me", "", "a b"]:
+            texto, erro = self.chamar("ver_tarefa", {"id": ident})
+            self.assertTrue(erro, ident)
+            self.assertIn("identificador", texto)
+
     def test_chave_recusada(self):
         pc = servidor.Paperclip(self.url, "chave-errada")
         texto, erro = self.chamar("criar_tarefa", {"departamento": "Crescimento", "titulo": "X", "descricao": "Y"},

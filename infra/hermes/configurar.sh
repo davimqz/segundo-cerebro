@@ -27,11 +27,19 @@ pc_carregar_config
 
 [[ -f "$HERMES_ENV" ]] || pc_falhar "não encontrei $HERMES_ENV (copie o .env.example e preencha)"
 # Lê uma variável do .env do Hermes sem executar o arquivo.
-env_hermes() { sed -n "s/^$1=//p" "$HERMES_ENV" | tail -n 1; }
+# Valores sem aspas (como no .env.example); o \r de um arquivo salvo no Windows é ignorado.
+env_hermes() { sed -n "s/^$1=//p" "$HERMES_ENV" | tail -n 1 | tr -d '\r'; }
 API_KEY_HERMES="$(env_hermes API_SERVER_KEY)"
 ((${#API_KEY_HERMES} >= 16)) || pc_falhar "API_SERVER_KEY vazia ou curta no .env do Hermes (gere com: openssl rand -hex 32)"
 DONO="$(env_hermes HERMES_DONO)"
 [[ -n "$DONO" ]] || pc_falhar "defina HERMES_DONO no .env do Hermes (quem fala com o Hermes)"
+# Regra de custo: só modelo gratuito do OpenRouter.
+[[ "$(env_hermes HERMES_MODELO)" == *:free ]] ||
+  pc_falhar "HERMES_MODELO vazio ou não gratuito no .env do Hermes (precisa terminar em :free)"
+for var in OPENROUTER_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_ALLOWED_USERS; do
+  [[ -n "$(env_hermes "$var")" ]] ||
+    echo "AVISO: $var vazia no .env do Hermes; o Hermes não vai responder no Telegram." >&2
+done
 PAPERCLIP_URL_INTERNA="$(env_hermes PAPERCLIP_API_URL)"
 PAPERCLIP_URL_INTERNA="${PAPERCLIP_URL_INTERNA:-http://paperclip:3100}"
 
@@ -49,15 +57,16 @@ echo "== Segredo com a chave da API do Hermes"
 SEGREDO_ID="$(pc_api GET "/companies/$EMPRESA_ID/secrets" |
   jq -r --arg k "$SEGREDO_CHAVE" '[.[] | select(.key == $k or .name == $k)][0].id // empty')"
 if [[ -z "$SEGREDO_ID" ]]; then
-  SEGREDO_ID="$(pc_api POST "/companies/$EMPRESA_ID/secrets" "$(jq -nc --arg k "$SEGREDO_CHAVE" \
-    --arg v "$API_KEY_HERMES" '{name: $k, key: $k, value: $v, description: "API_SERVER_KEY do Hermes (spec 005)"}')" |
+  # A chave vai ao jq pelo ambiente ($ENV.V), não por argumento: assim não aparece no ps.
+  SEGREDO_ID="$(pc_api POST "/companies/$EMPRESA_ID/secrets" "$(V="$API_KEY_HERMES" jq -nc --arg k "$SEGREDO_CHAVE" \
+    '{name: $k, key: $k, value: $ENV.V, description: "API_SERVER_KEY do Hermes (spec 005)"}')" |
     jq -r .id)"
   echo "   criado"
 elif [[ "${HERMES_TROCAR_CHAVE_API:-0}" == "1" ]]; then
-  pc_api POST "/secrets/$SEGREDO_ID/rotate" "$(jq -nc --arg v "$API_KEY_HERMES" '{value: $v}')" >/dev/null
+  pc_api POST "/secrets/$SEGREDO_ID/rotate" "$(V="$API_KEY_HERMES" jq -nc '{value: $ENV.V}')" >/dev/null
   echo "   nova versão gravada"
 else
-  echo "   já existe (para trocar: HERMES_TROCAR_CHAVE_API=1)"
+  echo "   já existe; a chave não foi comparada. Se você trocou a API_SERVER_KEY, rode com HERMES_TROCAR_CHAVE_API=1"
 fi
 [[ -n "$SEGREDO_ID" && "$SEGREDO_ID" != "null" ]] || pc_falhar "não consegui criar o segredo"
 
@@ -130,8 +139,18 @@ unset CHAVE_ATUAL
 if [[ $CHAVE_VALE -eq 1 ]]; then
   echo "   a chave do .env continua valendo"
 else
-  NOVA="$(pc_api POST "/agents/$AGENTE_ID/keys" '{"name":"hermes-telegram"}' | jq -r .token)"
+  CRIADA="$(pc_api POST "/agents/$AGENTE_ID/keys" '{"name":"hermes-telegram"}')"
+  NOVA="$(jq -r .token <<<"$CRIADA")"
+  NOVA_ID="$(jq -r .id <<<"$CRIADA")"
+  unset CRIADA
   [[ -n "$NOVA" && "$NOVA" != "null" ]] || pc_falhar "o Paperclip não devolveu a chave do agente"
+  # As chaves antigas do Hermes não estão mais no .env e ninguém as usa: revoga, para não
+  # sobrar credencial esquecida.
+  for antiga in $(pc_api GET "/agents/$AGENTE_ID/keys" |
+    jq -r --arg nova "$NOVA_ID" '.[] | select((.revokedAt // null) == null and .id != $nova) | .id'); do
+    pc_api DELETE "/agents/$AGENTE_ID/keys/$antiga" >/dev/null
+    echo "   chave antiga revogada"
+  done
   # Grava sem mostrar: arquivo novo com permissão 600, no lugar do antigo.
   (
     umask 077
@@ -167,5 +186,6 @@ pc_api GET "/agents/$AGENTE_ID" |
   jq -e '(.runtimeConfig.heartbeat.enabled == false) and ((.runtimeConfig.heartbeat.intervalSec // 0) == 0)' \
     >/dev/null || pc_falhar "o heartbeat agendado não ficou desligado"
 CHAVES="$(pc_api GET "/agents/$AGENTE_ID/keys" | jq '[.[] | select((.revokedAt // null) == null)] | length')"
+((CHAVES == 1)) || echo "AVISO: o Hermes tem $CHAVES chaves de agente ativas (esperado 1); revogue as extras no Paperclip." >&2
 echo "   1 agente $HERMES_NOME (hermes_gateway, sem heartbeat), $CHAVES chave(s) ativa(s)."
 echo "Configuração concluída. Suba o Hermes: sudo docker compose up -d --wait"

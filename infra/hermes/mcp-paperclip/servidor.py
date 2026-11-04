@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import unicodedata
 import urllib.error
@@ -30,6 +31,8 @@ NOME = "paperclip"
 VERSAO = "1.0.0"
 PROTOCOLO_PADRAO = "2025-06-18"
 TEMPO_LIMITE = 20
+# Identificador de tarefa (AST-12) ou UUID: só letras, números, hífen e sublinhado.
+IDENTIFICADOR = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 FERRAMENTAS = [
     {
@@ -120,11 +123,11 @@ class Paperclip:
         return self._empresa_id
 
     def departamentos(self) -> list[dict]:
-        projetos = self._api("GET", f"/companies/{urllib.parse.quote(self.empresa_id())}/projects") or []
+        projetos = self._api("GET", f"/companies/{urllib.parse.quote(self.empresa_id(), safe='')}/projects") or []
         return [p for p in projetos if p.get("name") and not p.get("archivedAt")]
 
     def link(self, identificador: str) -> str:
-        return f"{self.url_publica}/issues/{urllib.parse.quote(identificador)}"
+        return f"{self.url_publica}/issues/{urllib.parse.quote(identificador, safe='')}"
 
     def criar_tarefa(self, departamento: str, titulo: str, descricao: str) -> dict:
         titulo, descricao = titulo.strip(), descricao.strip()
@@ -138,7 +141,7 @@ class Paperclip:
             raise ErroPaperclip(f"o departamento '{departamento}' não existe. Os departamentos são: {nomes}.")
         tarefa = self._api(
             "POST",
-            f"/companies/{urllib.parse.quote(self.empresa_id())}/issues",
+            f"/companies/{urllib.parse.quote(self.empresa_id(), safe='')}/issues",
             {"title": titulo, "description": descricao, "projectId": projeto["id"], "parentId": None},
         ) or {}
         identificador = tarefa.get("identifier") or tarefa.get("id")
@@ -153,9 +156,9 @@ class Paperclip:
 
     def ver_tarefa(self, identificador: str) -> dict:
         identificador = identificador.strip()
-        if not identificador:
+        if not IDENTIFICADOR.fullmatch(identificador):
             raise ErroPaperclip("informe o identificador da tarefa, como AST-12.")
-        tarefa = self._api("GET", f"/issues/{urllib.parse.quote(identificador)}") or {}
+        tarefa = self._api("GET", f"/issues/{urllib.parse.quote(identificador, safe='')}") or {}
         ident = tarefa.get("identifier") or tarefa.get("id") or identificador
         projeto = tarefa.get("project") or {}
         return {

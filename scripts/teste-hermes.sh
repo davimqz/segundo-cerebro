@@ -204,6 +204,16 @@ configurar_hermes "$TMP/configurar-hermes-2.log"
 wait "$PID_SCRIPT" || { cat "$TMP/configurar-hermes-2.log" >&2; falhar "configurar.sh do Hermes (vez 2)"; }
 grep -q "já existe; configuração conferida" "$TMP/configurar-hermes-2.log" || falhar "a 2ª vez deveria achar o agente"
 grep -q "a chave do .env continua valendo" "$TMP/configurar-hermes-2.log" || falhar "a 2ª vez deveria manter a chave"
+
+# 3ª vez: o .env perdeu a chave de agente e a chave da API é regravada (HERMES_TROCAR_CHAVE_API).
+# Deve criar uma chave nova, revogar a antiga e gravar uma nova versão do segredo.
+sed -i 's/^PAPERCLIP_API_KEY=.*/PAPERCLIP_API_KEY=/' "$TMP/hermes/.env"
+rodar_aprovando "$TMP/configurar-hermes-3.log" env CONFIG_ENV="$TMP/paperclip/configuracao.env" \
+  PAPERCLIP_DIR="$TMP/paperclip" HERMES_TROCAR_CHAVE_API=1 bash "$TMP/hermes/configurar.sh"
+wait "$PID_SCRIPT" || { cat "$TMP/configurar-hermes-3.log" >&2; falhar "configurar.sh do Hermes (vez 3)"; }
+grep -q "nova versão gravada" "$TMP/configurar-hermes-3.log" || falhar "a 3ª vez deveria regravar o segredo"
+grep -q "chave antiga revogada" "$TMP/configurar-hermes-3.log" || falhar "a 3ª vez deveria revogar a chave antiga"
+grep -q "criada e gravada no .env" "$TMP/configurar-hermes-3.log" || falhar "a 3ª vez deveria criar uma chave nova"
 for log in "$TMP"/configurar-hermes-*.log; do
   grep -q "Chave temporária revogada" "$log" || falhar "configurar.sh do Hermes não revogou a chave de board"
 done
