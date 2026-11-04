@@ -147,6 +147,18 @@ dc exec -T postgres psql -U postgres -d postgres -Atc \
   "SELECT count(*) FROM pg_database WHERE datname = 'restauracao_teste'" | grep -qx 0 ||
   falhar "restauracao_teste deveria ter sido apagado"
 
+echo "== restaurar.sh com tabela que cresce sozinha"
+# Uma linha nova depois do backup: sem TABELAS_VIVAS acusa; com a tabela na lista, passa.
+dc exec -T postgres psql -U postgres -d painel -qc "INSERT INTO exemplo (nome) VALUES ('linha nova')" >/dev/null
+if TABELAS_VIVAS="" bash "$TMP/banco/backup/restaurar.sh" >/dev/null 2>&1; then
+  falhar "restaurar.sh deveria acusar a linha nova sem TABELAS_VIVAS"
+fi
+TABELAS_VIVAS="painel:public.exemplo" bash "$TMP/banco/backup/restaurar.sh" >"$TMP/restauracao-viva.log" ||
+  { cat "$TMP/restauracao-viva.log" >&2; falhar "restaurar.sh deveria aceitar a tabela que cresce sozinha"; }
+grep -q "public.exemplo muda sozinha" "$TMP/restauracao-viva.log" || falhar "restaurar.sh não avisou da tabela viva"
+bash "$TMP/banco/backup/backup.sh" >/dev/null
+echo "   ok"
+
 echo "== Retenção: 7 diárias e 4 semanais"
 # 30 snapshots antigos, um por dia, em caminhos diferentes (como os temporários do backup.sh).
 for dias in $(seq 1 30); do
