@@ -26,5 +26,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # As imagens do Paperclip (oficial e final) e do Hermes passam de 10 GB e enchem o disco do
+      # runner. Apaga ferramentas que o teste não usa (.NET, Android, GHC, CodeQL).
+      - name: Liberar espaço em disco
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - name: scripts/teste-hermes.sh
         run: bash scripts/teste-hermes.sh

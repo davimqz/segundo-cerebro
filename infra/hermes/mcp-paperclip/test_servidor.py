@@ -160,6 +160,10 @@ class TesteMcpPaperclip(unittest.TestCase):
         self.assertTrue(erro)
         self.assertIn("não consegui falar com o Paperclip", texto)
 
+    def test_url_sem_http_e_recusada(self):
+        with self.assertRaises(servidor.ErroPaperclip):
+            servidor.Paperclip("file:///etc/passwd", CHAVE)
+
     def test_sem_chave_configurada(self):
         with self.assertRaises(servidor.ErroPaperclip):
             servidor.Paperclip(self.url, "")

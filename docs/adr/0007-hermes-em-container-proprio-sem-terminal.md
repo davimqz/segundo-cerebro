@@ -1,6 +1,6 @@
 # 0007. Hermes em container próprio, sem terminal, ligado ao Paperclip pelo `hermes_gateway`
 
-- Status: Proposto
+- Status: Aceito
 - Data: 2026-11-04
 - Decidido por: Davi
 

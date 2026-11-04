@@ -83,6 +83,10 @@ class Paperclip:
     def __init__(self, url: str, chave: str, url_publica: str = ""):
         if not url or not chave:
             raise ErroPaperclip("PAPERCLIP_API_URL ou PAPERCLIP_API_KEY não definida no .env do Hermes.")
+        # Só http(s): o endereço vem do .env, nunca do modelo, e assim um valor errado não vira
+        # leitura de arquivo local (file://).
+        if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+            raise ErroPaperclip("PAPERCLIP_API_URL precisa começar com http:// ou https://.")
         self.url = url.rstrip("/")
         self.chave = chave
         self.url_publica = (url_publica or url).rstrip("/")
@@ -101,7 +105,9 @@ class Paperclip:
             },
         )
         try:
-            with urllib.request.urlopen(pedido, timeout=TEMPO_LIMITE) as resposta:
+            # O esquema foi conferido no __init__ (só http/https) e o caminho é montado aqui, com os
+            # trechos variáveis codificados por quote(safe="").
+            with urllib.request.urlopen(pedido, timeout=TEMPO_LIMITE) as resposta:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
                 return json.loads(resposta.read() or b"null")
         except urllib.error.HTTPError as erro:
             erro.close()
