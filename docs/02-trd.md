@@ -39,7 +39,7 @@ Todos os serviços rodam em containers Docker no VPS, definidos em um único Doc
 
 | Serviço | Função | Memória estimada | Fonte da estimativa |
 | --- | --- | --- | --- |
-| Hermes Agent | Orquestrador, conversa pelo Telegram, executa tarefas | \~1 GB | [Hostinger](https://www.hostinger.com/de/tutorials/?p=11258): o container usa cerca de 1 GB |
+| Hermes Agent | Orquestrador, conversa pelo Telegram, executa tarefas | \~1 GB (limite de 1,5 GB) | [Hostinger](https://www.hostinger.com/de/tutorials/?p=11258): o container usa cerca de 1 GB; medir na implantação (spec 005) |
 | Paperclip | Organograma, tarefas, aprovações, orçamento e auditoria | \~1 GB | [Railway](https://railway.com/deploy/paperclip-ai-agent-company-os-current-release-no-build-step--paperclip-or-ai-agent-company-os-current): confortável com cerca de 1 GB parado |
 | n8n | Automações e integrações | \~1 GB | Estimativa; [is\*hosting](https://blog.ishosting.com/en/self-host-n8n-requirements): 8 GB comportam n8n, PostgreSQL e Redis |
 | PostgreSQL | Instância única, um banco lógico por serviço (painel, n8n, Paperclip) | \~0,5 GB | Estimativa, a medir |
@@ -58,7 +58,12 @@ Nenhum serviço é acessado diretamente pela internet: todo acesso web passa pel
 - **Cloudflare Access:** cada serviço web (painel, Paperclip, n8n) fica atrás de uma tela de login da Cloudflare, liberada só para o e-mail de Davi. O plano gratuito cobre até 50 usuários, com retenção de logs de 24 horas ([Costbench](https://costbench.com/software/business-vpn/cloudflare-zero-trust/free-plan/)).
 - **Subdomínios:** `painel.asttralabs.com.br` e `agentes.asttralabs.com.br` (Paperclip), no ar. `automacoes.asttralabs.com.br` (n8n) ainda é proposto. Todos com o proxy da Cloudflare ligado.
 - **Containers:** portas publicadas só em `127.0.0.1`, porque o Docker ignora o UFW. Os serviços conversam entre si por uma rede Docker interna.
-- **Hermes isolado:** comandos executados pelo agente rodam em container separado (`terminal.backend docker`), com modo de aprovação ligado (`approval_mode ask`). O gateway do Telegram só faz conexões de saída.
+- **Hermes isolado ([ADR 0007](adr/0007-hermes-em-container-proprio-sem-terminal.md)):**
+  - O Hermes roda em container próprio, só na rede interna, sem porta publicada e sem o socket do Docker.
+  - Por enquanto, ele não tem terminal, execução de código, arquivos nem navegador. As ferramentas ficam desligadas em duas camadas no `config.yaml`, com o modo de aprovação `manual` como defesa extra.
+  - O terminal em container separado (`terminal.backend docker`) fica para quando alguma tarefa precisar, com ADR próprio.
+  - O gateway do Telegram só faz conexões de saída (long polling).
+  - O Paperclip chama o Hermes pela API dele (porta 8642, com chave), e o Hermes fala com o Paperclip por um MCP próprio, com a chave de agente.
 - **Segredos:** chaves de API, tokens e senhas ficam em arquivos `.env` fora do Git, com permissão restrita ao usuário do serviço. Nunca entram na base de conhecimento nem nas mensagens.
 - **Skills de terceiros:** só de publicadores verificados e após revisão do código.
 
@@ -92,9 +97,9 @@ O Hermes conversa com Davi; o n8n faz as integrações com serviços externos; o
 
 | Integração | Como conecta | Fase |
 | --- | --- | --- |
-| Telegram | Gateway do Hermes, com bot próprio e acesso restrito ao usuário de Davi | MVP |
+| Telegram | Dois bots. O do Hermes, para conversar, com acesso restrito ao ID de Davi (spec 005). O do painel, só para aprovações (item 6b) | MVP |
 | Gmail, Google Agenda e Drive | n8n com OAuth do Google; o Hermes chama fluxos do n8n como ferramentas | MVP |
-| Paperclip | Adaptador oficial `hermes-paperclip-adapter`, mantido pela Nous Research | MVP |
+| Paperclip | Adaptador `hermes_gateway` do Paperclip (o Paperclip chama a API do Hermes) e um MCP próprio com 3 ferramentas (o Hermes cria e lê tarefas). Spec 005 | MVP |
 | Construção de fluxos | `n8n-mcp` + skills `n8n-skills`, usados pelo Claude Code para criar fluxos que Davi revisa | MVP |
 | WhatsApp | API oficial da Meta (Cloud API), via gateway do Hermes ou Evolution API | Fase 2 |
 | E-mail Hostinger | IMAP e SMTP pelo n8n | Fase 2 |
@@ -103,7 +108,7 @@ O Hermes conversa com Davi; o n8n faz as integrações com serviços externos; o
 
 **Modelo de IA**
 
-- **Modelos gratuitos** pelo OpenRouter, configurados no Hermes. Há limite de requisições por dia.
+- **Modelos gratuitos** pelo OpenRouter, configurados no Hermes (`HERMES_MODELO`), numa conta sem créditos. Há limite de requisições por dia. As tarefas auxiliares do Hermes usam o mesmo modelo (`auxiliary.free_only`).
 - **Sem modelo pago de reserva por enquanto.** Quando o limite diário for atingido, o painel mostra um aviso, e Davi decide o que fazer.
 - **Regra de dados:** conteúdos sensíveis de clientes não devem ser enviados a modelos gratuitos cujos termos permitam usar os dados para treinamento. A lista de modelos permitidos será definida na implantação, após ler os termos de cada um.
 
@@ -144,7 +149,7 @@ O custo mensal do MVP fica no valor do servidor; todo o software e os serviços 
 
 | Risco | Mitigação |
 | --- | --- |
-| Paperclip executa os agentes dentro do próprio container, sem isolamento | Rodar o Hermes em container separado, com execução de comandos isolada |
+| Paperclip executa os agentes dentro do próprio container, sem isolamento | Hermes em container separado pelo `hermes_gateway`, sem terminal (ADR 0007) |
 | Login de agentes pela interface do Paperclip falha em instalações próprias, segundo o [modelo da Railway](https://railway.com/deploy/paperclip-agent-orchestration) | Configurar credenciais por variável de ambiente e testar o adaptador do Hermes antes do restante |
 | Memória apertada | Limites de memória por container no Compose; medir a cada serviço novo |
 | Conflitos de edição na base de conhecimento entre Obsidian e agentes | Agentes trabalham em ramos separados ou commits pequenos, com revisão |

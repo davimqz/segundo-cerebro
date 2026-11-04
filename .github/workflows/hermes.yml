@@ -1,0 +1,30 @@
+name: Hermes
+
+# Sobe banco, Paperclip e Hermes (imagens de ~2,5 GB e ~1,1 GB). Por isso este teste roda só
+# quando muda a infra do Hermes, a do Paperclip ou o próprio teste (spec 005).
+on:
+  pull_request:
+    paths:
+      - "infra/hermes/**"
+      - "infra/paperclip/**"
+      - "scripts/teste-hermes.sh"
+      - ".github/workflows/hermes.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/hermes/**"
+      - "scripts/teste-hermes.sh"
+      - ".github/workflows/hermes.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integracao:
+    name: Integração do Hermes
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: scripts/teste-hermes.sh
+        run: bash scripts/teste-hermes.sh

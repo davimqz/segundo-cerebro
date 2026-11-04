@@ -2,7 +2,7 @@
 
 - Risco: R2
 - Origem: Build Plan, Etapa 1, item 6a; PRD, RF05 e "Modelo de agentes"; TRD, "Rede e segurança", "Integrações" e "Modelo de IA"; App Flow, "Pedir uma tarefa"
-- Status: Aprovada
+- Status: Implementada (2026-11-04); falta a implantação no servidor (passos 8 e 9 do plano)
 
 ## Objetivo
 Davi conversa com o Hermes por um bot do Telegram e pede tarefas em linguagem natural. Antes de agir, o Hermes confirma o que entendeu. Depois do "sim", ele cria a tarefa no projeto certo do Paperclip (RF05). Este item instala o Hermes no servidor, num container próprio, com modelos gratuitos do OpenRouter. O Hermes passa a ser o primeiro agente do Paperclip. As aprovações pelo painel e pelo Telegram ficam para o item 6b (spec 006).
