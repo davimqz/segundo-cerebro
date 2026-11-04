@@ -668,8 +668,8 @@ No servidor:
 69. **Descobrir o seu ID do Telegram** (celular). Abra o `@userinfobot` e mande qualquer mensagem. Ele responde com um número (o "Id"): anote. É só esse número que o Hermes vai aceitar.
 70. **Criar a conta do OpenRouter, sem créditos** (navegador, em `openrouter.ai`). Crie a conta, **não cadastre cartão nem compre créditos** e crie uma chave em Keys com o nome `hermes-asttra`. Guarde a chave no gerenciador como "OpenRouter – chave do Hermes". Sem créditos, nada pode ser cobrado; os modelos gratuitos têm um limite diário de pedidos.
 71. **Escolher o modelo gratuito** (navegador, com o Davi decidindo). Em `openrouter.ai/models`, filtre pelos gratuitos (`:free`) que aceitam ferramentas ("tools"). O Hermes precisa disso para criar tarefas. Em cada candidato, abra a aba de provedores e leia a política de dados.
-    - O `config.yaml` pede `data_collection: deny`, ou seja, só provedores que não guardam as conversas.
-    - Se nenhum modelo gratuito com ferramentas tiver provedor assim, **pare aqui**: trocar para `allow` é decisão do Davi, registrada na spec 005.
+    - Escolhido em 2026-11-04: `nvidia/nemotron-3-ultra-550b-a55b:free`. A NVIDIA registra as conversas do endpoint gratuito, por isso o `config.yaml` usa `data_collection: allow`. **Não mande ao Hermes dados pessoais nem informação confidencial de clientes.**
+    - Ao trocar de modelo, leia de novo a política de dados. Mudar a regra de dados é decisão do Davi, registrada na spec 005.
     - Em Settings > Privacy, confira se a conta não bloqueia o modelo escolhido.
     - Anote o nome completo do modelo (por exemplo, `fornecedor/modelo:free`).
 72. **Liberar o nome interno do Paperclip** (no servidor). O Hermes chama o Paperclip por `http://paperclip:3100`, e o Paperclip só aceita os nomes da lista `PAPERCLIP_ALLOWED_HOSTNAMES`. A linha mostrada no fim deve terminar com `,paperclip`.
