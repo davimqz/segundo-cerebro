@@ -139,4 +139,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 6 (Hermes no Telegram): classificar o risco e gerar a spec com `/asttra:feature`. Os itens 1 a 5 da Etapa 1 estão concluídos. O Paperclip está no ar desde 2026-11-03 (spec 004) e ainda não tem agentes: o Hermes será o primeiro.
+1. Etapa 1, item 6a (Hermes no Telegram): implementar a spec `docs/specs/005-hermes-no-telegram.md` (R2), começando pela pesquisa na versão fixada e pelo ADR 0007. O item 6 foi dividido em 6a e 6b (aprovações no painel e no Telegram, spec 006 a escrever). Os itens 1 a 5 da Etapa 1 estão concluídos. O Paperclip está no ar desde 2026-11-03 (spec 004) e ainda não tem agentes: o Hermes será o primeiro.
