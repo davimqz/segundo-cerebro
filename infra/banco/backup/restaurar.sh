@@ -28,6 +28,9 @@ fi
 : "${RESTIC_PASSWORD:?defina RESTIC_PASSWORD no backup.env}"
 PAPERCLIP_DADOS="${PAPERCLIP_DADOS:-/opt/asttra/paperclip/dados}"
 HERMES_DADOS="${HERMES_DADOS:-/opt/asttra/hermes/dados}"
+# Tabelas que crescem sozinhas, no formato banco:esquema.tabela, separadas por espaço. O
+# Paperclip anota cada uso de segredo (a chave do Hermes, a cada minuto) em secret_access_events.
+TABELAS_VIVAS="${TABELAS_VIVAS:-paperclip:public.secret_access_events}"
 
 pg() {
   docker compose --project-directory "$BANCO_DIR" exec -T postgres "$@"
@@ -85,8 +88,35 @@ for dump in "${dumps[@]}"; do
   pg psql -v ON_ERROR_STOP=1 -U postgres -d postgres -qc "CREATE DATABASE $TESTE"
   pg pg_restore -U postgres -d "$TESTE" --no-owner --no-acl --exit-on-error <"$dump"
 
-  contar "$banco" >"$TMP/original.txt"
-  contar "$TESTE" >"$TMP/restaurado.txt"
+  contar "$banco" >"$TMP/original-tudo.txt"
+  contar "$TESTE" >"$TMP/restaurado-tudo.txt"
+  # Tabelas que crescem sozinhas (registros de auditoria): ficam fora da comparação exata. Elas
+  # só podem ter crescido desde o backup, nunca diminuído.
+  vivas=()
+  for item in $TABELAS_VIVAS; do
+    [[ "${item%%:*}" == "$banco" ]] && vivas+=("${item#*:}")
+  done
+  cp "$TMP/original-tudo.txt" "$TMP/original.txt"
+  cp "$TMP/restaurado-tudo.txt" "$TMP/restaurado.txt"
+  for tabela in "${vivas[@]}"; do
+    antes="$(sed -n "s/^${tabela//./\\.}|//p" "$TMP/restaurado-tudo.txt")"
+    agora="$(sed -n "s/^${tabela//./\\.}|//p" "$TMP/original-tudo.txt")"
+    grep -v "^${tabela//./\\.}|" "$TMP/original-tudo.txt" >"$TMP/original.txt" || true
+    grep -v "^${tabela//./\\.}|" "$TMP/restaurado-tudo.txt" >"$TMP/restaurado.txt" || true
+    cp "$TMP/original.txt" "$TMP/original-tudo.txt"
+    cp "$TMP/restaurado.txt" "$TMP/restaurado-tudo.txt"
+    if [[ -z "$antes" && -z "$agora" ]]; then
+      continue
+    elif [[ -z "$antes" || -z "$agora" ]]; then
+      echo "   $tabela existe só num dos bancos (backup ou atual)." >&2
+      diferencas=1
+    elif ((agora >= antes)); then
+      echo "   $tabela muda sozinha: $antes no backup, $agora agora (ok)."
+    else
+      echo "   $tabela tem menos linhas agora ($agora) do que no backup ($antes)." >&2
+      diferencas=1
+    fi
+  done
   if diff -u "$TMP/original.txt" "$TMP/restaurado.txt"; then
     echo "   $(wc -l <"$TMP/original.txt") tabela(s), contagens iguais."
   else
