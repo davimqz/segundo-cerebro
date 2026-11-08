@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { registrar } from "../atividades/servico";
 import { banco } from "../db/client";
 import { AVISO_TIPOS, avisos, type AvisoTipo } from "../db/schema";
@@ -59,5 +59,58 @@ export async function resolver(id: number, usuario: { id: string }): Promise<boo
       tx,
     );
     return true;
+  });
+}
+
+/**
+ * Garante um único aviso aberto para a origem dada (usado pelo painel e pelo bot quando um serviço
+ * cai). Se já houver um aberto, não cria outro. Devolve true se criou.
+ */
+export async function garantirAviso(tipo: AvisoTipo, mensagem: string, origem: string): Promise<boolean> {
+  const texto = mensagem.trim().slice(0, 500);
+  return banco().transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${"aviso:" + origem}, 0))`);
+    const [aberto] = await tx
+      .select({ id: avisos.id })
+      .from(avisos)
+      .where(and(eq(avisos.origem, origem), isNull(avisos.resolvidoEm)))
+      .limit(1);
+    if (aberto) return false;
+    const [aviso] = await tx.insert(avisos).values({ tipo, mensagem: texto, origem }).returning();
+    await registrar(
+      {
+        autorTipo: "sistema",
+        autorId: origem,
+        acao: "aviso_criado",
+        alvo: `aviso:${aviso.id}`,
+        detalhes: { tipo, mensagem: texto },
+      },
+      tx,
+    );
+    return true;
+  });
+}
+
+/** Resolve, pelo sistema, os avisos abertos da origem (quando o serviço volta). Devolve quantos. */
+export async function resolverAvisosDe(origem: string): Promise<number> {
+  return banco().transaction(async (tx) => {
+    const resolvidos = await tx
+      .update(avisos)
+      .set({ resolvidoEm: new Date(), resolvidoPor: origem })
+      .where(and(eq(avisos.origem, origem), isNull(avisos.resolvidoEm)))
+      .returning();
+    for (const aviso of resolvidos) {
+      await registrar(
+        {
+          autorTipo: "sistema",
+          autorId: origem,
+          acao: "aviso_resolvido",
+          alvo: `aviso:${aviso.id}`,
+          detalhes: { tipo: aviso.tipo, mensagem: aviso.mensagem },
+        },
+        tx,
+      );
+    }
+    return resolvidos.length;
   });
 }

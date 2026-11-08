@@ -33,6 +33,35 @@ export function urlDoBanco(): string {
   return url;
 }
 
+export type ConfigPaperclip = { url: string; empresaId: string; chave: string; tempoLimiteMs?: number };
+
+/**
+ * Conexão do painel com o Paperclip para as aprovações (spec 006). As três variáveis são opcionais:
+ * sem alguma delas, devolve null e a tela Aprovações diz que não está configurada.
+ */
+export function aprovacoesConfiguradas(): ConfigPaperclip | null {
+  const url = process.env.PAPERCLIP_URL?.trim();
+  const empresaId = process.env.PAPERCLIP_EMPRESA_ID?.trim();
+  const chave = process.env.PAPERCLIP_CHAVE_BOARD?.trim();
+  if (!url || !empresaId || !chave) return null;
+  return { url: url.replace(/\/+$/, ""), empresaId, chave };
+}
+
+export type ConfigTelegramAprovacoes = { token: string; chatId: string };
+
+/** O bot de aprovações do Telegram. Só o ID numérico de TELEGRAM_APROVACOES_CHAT_ID é aceito. */
+export function telegramAprovacoes(): ConfigTelegramAprovacoes | null {
+  const token = process.env.TELEGRAM_APROVACOES_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_APROVACOES_CHAT_ID?.trim();
+  if (!token || !chatId || !/^-?\d+$/.test(chatId)) return null;
+  return { token, chatId };
+}
+
+/** Endereço público do painel, para os links das mensagens (vazio se não houver). */
+export function urlDoPainel(): string {
+  return (process.env.BETTER_AUTH_URL ?? "").trim().replace(/\/+$/, "");
+}
+
 /** Nome do painel, sem exigir as outras variáveis (usado em telas públicas). */
 export function nomeDoPainel(): string {
   return process.env.PAINEL_NOME?.trim() || "Painel";

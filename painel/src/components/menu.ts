@@ -9,7 +9,7 @@ export const MENU: GrupoDoMenu[] = [
     nome: "Decidir",
     telas: [
       { href: "/", nome: "Início" },
-      { href: "/aprovacoes", nome: "Aprovações", etapa: "Etapa 1, item 5" },
+      { href: "/aprovacoes", nome: "Aprovações" },
       { href: "/tarefas", nome: "Tarefas", etapa: "Etapa 1, item 5" },
     ],
   },

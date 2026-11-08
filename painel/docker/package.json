@@ -5,6 +5,7 @@
   "scripts": {
     "db:migrar": "node servidor/dist-scripts/migrar.mjs",
     "usuario": "node servidor/dist-scripts/usuario.mjs",
-    "aviso": "node servidor/dist-scripts/aviso.mjs"
+    "aviso": "node servidor/dist-scripts/aviso.mjs",
+    "bot-aprovacoes": "node servidor/dist-scripts/bot-aprovacoes.mjs"
   }
 }

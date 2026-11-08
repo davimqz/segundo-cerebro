@@ -64,7 +64,7 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
      - Spec: [005](specs/005-hermes-no-telegram.md).
    - **6b. Aprovações no painel e no Telegram:** tela Aprovações do painel e um segundo bot, do painel, com os botões Aprovar/Recusar. O primeiro "sim" ou "não" vale, e o outro lugar mostra quem decidiu. A decisão fica registrada em Atividades. O poder de aprovar fica no painel, nunca no Hermes.
      - Pronto quando: um pedido de aprovação aparece no painel e no Telegram ao mesmo tempo; Davi aprova num deles e o outro se atualiza.
-     - Spec: 006, a escrever.
+     - Spec: [006](specs/006-aprovacoes-no-painel-e-no-telegram.md).
 7. **Ponte do Hermes com o painel (servidor MCP):** o Hermes consulta e age no painel, registrando tudo em Atividades.
    - Pronto quando: um pedido no Telegram cria um registro no painel.
 8. **n8n:** instalado, com `n8n-mcp`, ligado ao Gmail, Google Agenda e Google Drive.
@@ -106,6 +106,10 @@ Ideias de infraestrutura (da spec 001):
 Ideias do Hermes (da spec 005), para Davi decidir:
 - **Pesquisa na web:** a imagem do Hermes não tem busca gratuita embutida, e a leitura de páginas alcançaria a rede interna do Docker. A ferramenta `web` ficou desligada. Para ligar, seria preciso uma chave de busca (por exemplo, o plano gratuito do Brave Search) e um bloqueio da rede interna.
 - **Terminal em sandbox:** deixar o Hermes rodar comandos num container descartável, quando alguma tarefa precisar (talvez no item 9). Exige decidir como dar acesso ao Docker sem dar poder de root (proxy do socket ou outra saída), com ADR.
+
+Ideias das aprovações (da spec 006), para Davi decidir:
+- **Botão Editar:** usar o "pedir revisão" do Paperclip para devolver o pedido ao agente com o que mudar.
+- **`pedir_aprovacao` no Hermes:** uma ferramenta no MCP do Hermes para ele criar pedidos de aprovação. Deve entrar junto com a primeira ação real (o e-mail, no item 9).
 
 Ideias do Paperclip (da spec 004), para Davi decidir:
 - **Backup interno do Paperclip:** ele copia o próprio banco a cada hora para a pasta de dados, e isso também entra no restic. Pode ser desligado com `PAPERCLIP_DB_BACKUP_ENABLED=false`.

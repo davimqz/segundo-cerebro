@@ -5,6 +5,9 @@
 #   - o primeiro admin pelo convite-admin.sh;
 #   - configurar.sh duas vezes: 1 empresa, 5 projetos, trava de contratação, orçamento 0, 0 agentes;
 #   - teste-aprovacao.sh: pedido pendente, aprovado pela API, status approved e chave revogada;
+#   - o contrato que o painel usa (spec 006): criar-chave-paperclip.sh cria a chave sem validade e a
+#     grava no .env; com ela, listar pendentes, aprovar, repetir a aprovação (nada muda) e recusar
+#     depois (422);
 #   - os dados continuam depois de recriar o container.
 # As chaves temporárias são aprovadas pela sessão do admin de teste, como o Davi faria no navegador.
 #
@@ -175,11 +178,13 @@ sessao() {
   fi
 }
 
-# Roda um script de infra/paperclip em segundo plano e aprova o pedido de chave dele pela sessão.
-# Uso: rodar_aprovando LOG script.sh
+# Roda um script em segundo plano e aprova o pedido de chave dele pela sessão.
+# Uso: rodar_aprovando LOG script.sh (de infra/paperclip) ou rodar_aprovando LOG /caminho/script.sh
 rodar_aprovando() {
-  local log="$1" script="$2" caminho id token
-  CONFIG_ENV="$TMP/paperclip/configuracao.env" bash "$TMP/paperclip/$script" >"$log" 2>&1 &
+  local log="$1" script="$2" caminho id token alvo
+  alvo="$script"
+  [[ "$alvo" == */* ]] || alvo="$TMP/paperclip/$script"
+  CONFIG_ENV="$TMP/paperclip/configuracao.env" bash "$alvo" >"$log" 2>&1 &
   PID_SCRIPT=$!
   for _ in $(seq 1 60); do
     caminho="$(sed -n 's#^  http[^ ]*\(/cli-auth/[^ ]*\)$#\1#p' "$log")"
@@ -236,6 +241,85 @@ grep -q "Status do pedido: approved" "$TMP/aprovacao.log" || falhar "teste-aprov
 grep -q "Chave temporária revogada" "$TMP/aprovacao.log" || falhar "teste-aprovacao.sh não revogou a chave"
 ativas="$(sessao GET /board-api-keys | jq 'length')"
 [[ "$ativas" == "0" ]] || falhar "deveria haver 0 chaves de board ativas, há $ativas"
+if grep -rq 'pcp_board_' "$TMP"/*.log; then
+  falhar "uma chave de board apareceu nos logs dos scripts"
+fi
+echo "   ok"
+
+echo "== Contrato do painel (spec 006): chave sem validade"
+cp -r "$RAIZ/infra/painel" "$TMP/painel"
+ENV_PAINEL="$TMP/painel/.env"
+printf 'PAINEL_NOME=Painel de Teste\nPAPERCLIP_CHAVE_BOARD=antiga\n' >"$ENV_PAINEL"
+export PAINEL_ENV="$ENV_PAINEL"
+for vez in 1 2; do
+  rodar_aprovando "$TMP/chave-$vez.log" "$TMP/painel/criar-chave-paperclip.sh"
+  wait "$PID_SCRIPT" || { cat "$TMP/chave-$vez.log" >&2; falhar "criar-chave-paperclip.sh (vez $vez)"; }
+  grep -q "Chave temporária revogada" "$TMP/chave-$vez.log" || falhar "criar-chave-paperclip.sh não revogou a chave temporária"
+done
+unset PAINEL_ENV
+grep -q "chave antiga revogada" "$TMP/chave-2.log" || falhar "a 2ª vez deveria revogar a chave anterior"
+grep -qx 'PAINEL_NOME=Painel de Teste' "$ENV_PAINEL" || falhar "o .env perdeu as outras variáveis"
+[[ "$(grep -c '^PAPERCLIP_CHAVE_BOARD=' "$ENV_PAINEL")" == "1" ]] || falhar "o .env deveria ter uma só PAPERCLIP_CHAVE_BOARD"
+grep -qx "PAPERCLIP_EMPRESA_ID=$EMPRESA_ID" "$ENV_PAINEL" || falhar "o .env não tem o PAPERCLIP_EMPRESA_ID certo"
+CHAVE_PAINEL="$(sed -n 's/^PAPERCLIP_CHAVE_BOARD=//p' "$ENV_PAINEL")"
+[[ "$CHAVE_PAINEL" == pcp_board_* ]] || falhar "a chave gravada no .env não tem o formato esperado"
+chaves="$(sessao GET /board-api-keys)"
+jq -e 'length == 1 and .[0].name == "painel-aprovacoes" and .[0].expiresAt == null' <<<"$chaves" >/dev/null ||
+  falhar "deveria haver só a chave painel-aprovacoes, sem validade: $(jq -c '[.[] | {name, expiresAt}]' <<<"$chaves")"
+(umask 077 && printf 'authorization: Bearer %s\n' "$CHAVE_PAINEL" >"$TMP/cabecalho-painel")
+unset CHAVE_PAINEL
+echo "   ok"
+
+# API como o painel (com a chave do .env). Uso: painel MÉTODO /caminho [corpo]. Imprime o status
+# HTTP na última linha.
+painel() {
+  local metodo="$1" caminho="$2" corpo="${3:-}"
+  local args=(-sS -w '\n%{http_code}' -H "@$TMP/cabecalho-painel" -X "$metodo")
+  if [[ -n "$corpo" ]]; then
+    printf '%s' "$corpo" | curl "${args[@]}" -H "content-type: application/json" --data-binary @- "$URL/api$caminho"
+  else
+    curl "${args[@]}" "$URL/api$caminho"
+  fi
+}
+corpo_de() { sed '$d' <<<"$1"; }
+status_de() { tail -n1 <<<"$1"; }
+
+echo "== Contrato do painel: listar, aprovar, repetir e recusar depois"
+r="$(painel POST "/companies/$EMPRESA_ID/approvals" \
+  '{"type":"request_board_approval","payload":{"titulo":"Contrato 006","descricao":"Teste do painel."}}')"
+[[ "$(status_de "$r")" == "201" ]] || falhar "criar pedido com a chave do painel: $(status_de "$r")"
+P6="$(corpo_de "$r" | jq -r .id)"
+r="$(painel GET "/companies/$EMPRESA_ID/approvals?status=pending")"
+[[ "$(status_de "$r")" == "200" ]] || falhar "listar pendentes: $(status_de "$r")"
+corpo_de "$r" | jq -e --arg id "$P6" 'any(.[]; .id == $id and .status == "pending" and .payload.titulo == "Contrato 006"
+  and has("createdAt") and has("requestedByAgentId"))' >/dev/null ||
+  falhar "o pedido não veio na lista de pendentes com os campos esperados"
+echo "   campos de um pedido: $(corpo_de "$r" | jq -c '.[0] | keys')"
+r="$(painel POST "/approvals/$P6/approve" '{"decisionNote":null}')"
+[[ "$(status_de "$r")" == "200" ]] || falhar "aprovar: $(status_de "$r")"
+corpo_de "$r" | jq -e '.status == "approved" and .decidedAt != null' >/dev/null || falhar "aprovar não devolveu approved"
+DECIDIDO_EM="$(corpo_de "$r" | jq -r .decidedAt)"
+r="$(painel POST "/approvals/$P6/approve" '{}')"
+[[ "$(status_de "$r")" == "200" ]] || falhar "repetir a aprovação deveria dar 200, deu $(status_de "$r")"
+corpo_de "$r" | jq -e --arg d "$DECIDIDO_EM" '.status == "approved" and .decidedAt == $d' >/dev/null ||
+  falhar "repetir a aprovação mudou o pedido"
+r="$(painel POST "/approvals/$P6/reject" '{"decisionNote":"tarde demais"}')"
+[[ "$(status_de "$r")" == "422" ]] || falhar "recusar depois de aprovado deveria dar 422, deu $(status_de "$r")"
+r="$(painel GET "/approvals/$P6")"
+corpo_de "$r" | jq -e '.status == "approved" and .decisionNote == null' >/dev/null || falhar "o pedido deveria continuar approved"
+r="$(painel GET "/companies/$EMPRESA_ID/approvals?status=pending")"
+corpo_de "$r" | jq -e --arg id "$P6" 'all(.[]; .id != $id)' >/dev/null || falhar "o pedido aprovado continua nos pendentes"
+# Recusa com motivo.
+r="$(painel POST "/companies/$EMPRESA_ID/approvals" '{"type":"request_board_approval","payload":{"titulo":"Recusa 006"}}')"
+P7="$(corpo_de "$r" | jq -r .id)"
+r="$(painel POST "/approvals/$P7/reject" '{"decisionNote":"Motivo de teste"}')"
+corpo_de "$r" | jq -e '.status == "rejected" and .decisionNote == "Motivo de teste"' >/dev/null || falhar "recusar com motivo"
+r="$(painel POST "/approvals/$P7/approve" '{}')"
+[[ "$(status_de "$r")" == "422" ]] || falhar "aprovar depois de recusado deveria dar 422, deu $(status_de "$r")"
+# Chave errada: 401 (o painel mostra um aviso).
+r="$(curl -sS -o /dev/null -w '%{http_code}' -H "authorization: Bearer pcp_board_invalida" \
+  "$URL/api/companies/$EMPRESA_ID/approvals?status=pending")"
+[[ "$r" == "401" || "$r" == "403" ]] || falhar "chave inválida deveria dar 401 ou 403, deu $r"
 if grep -rq 'pcp_board_' "$TMP"/*.log; then
   falhar "uma chave de board apareceu nos logs dos scripts"
 fi

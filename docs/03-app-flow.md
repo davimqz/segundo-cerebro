@@ -45,13 +45,14 @@ flowchart LR
   B --> C[Aviso no Telegram e no painel]
   C --> D{Davi decide}
   D -->|Aprovar| E[Ação executada]
-  D -->|Editar| A
   D -->|Recusar + motivo| F[Agente registra e aprende]
   E --> G[Registro em Atividades]
   F --> G
 ```
 
 Vale para tudo o que sai da empresa ou não pode ser desfeito: e-mails, mensagens, posts, gastos e exclusões. Leitura, rascunhos e tarefas internas não passam por aqui.
+
+**Na tela Aprovações (spec 006):** os pedidos pendentes ficam no topo, do mais antigo para o mais novo, com o tipo, o título, a descrição, os outros campos, quem pediu e quando. Cada um tem Aprovar e Recusar; Recusar abre o campo do motivo, que é obrigatório. Embaixo ficam os 20 últimos decididos, com a decisão, o motivo, quando e onde (painel, Telegram ou Paperclip). A tela se atualiza sozinha a cada 10 segundos. Se o pedido já foi decidido em outro lugar, a tela mostra "Já decidido" com a decisão que valeu. O botão Editar ficou para depois (Ideias no Build Plan).
 
 ## Fluxos pelo Telegram
 
@@ -70,9 +71,10 @@ Fica registrado só como possibilidade; entra quando Davi pedir.
 
 **Aprovar pelo celular**
 
-1. Chega no Telegram: o que o agente quer fazer, o conteúdo e três botões: Aprovar, Editar, Recusar.
-2. Aprovar executa a ação. Editar abre a conversa para ajustar o texto. Recusar pede um motivo, que o agente usa para aprender.
-3. A decisão fica registrada em Atividades no painel.
+1. Chega no bot de aprovações (o segundo bot, não o do Hermes): o título, a descrição, quem pediu, o link do pedido no painel e dois botões: Aprovar e Recusar.
+2. Aprovar decide na hora, e a mensagem vira "Aprovado no Telegram às HH:MM", sem botões. Recusar pergunta o motivo numa mensagem de resposta; a resposta do Davi vira o motivo.
+3. Se o pedido for decidido no painel ou no Paperclip, a mensagem muda para quem decidiu, em até ~15 segundos.
+4. A decisão fica registrada em Atividades no painel. Só o ID do Davi é aceito; o bot ignora qualquer outra pessoa.
 
 ## Fluxo de um lead novo
 

@@ -1,6 +1,7 @@
 # Painel (Next.js). No servidor fica em /opt/asttra/painel/ (cópia desta pasta), com o .env ao lado.
 # A imagem é construída no próprio servidor a partir do repositório em /opt/asttra/painel-src (ADR 0005).
 # Precisa da rede "asttra" e do PostgreSQL de infra/banco no ar.
+# Dois serviços com a mesma imagem: o painel e o bot de aprovações do Telegram (spec 006, ADR 0008).
 #
 # Atualizar: cd /opt/asttra/painel-src && git pull && cd /opt/asttra/painel && sudo docker compose up -d --build
 
@@ -33,6 +34,30 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
+    networks:
+      - asttra
+
+  # Bot de aprovações do Telegram: long polling, sem webhook e sem porta publicada (ADR 0008).
+  # Sem as variáveis do Paperclip e do Telegram no .env, ele fica parado (veja o log).
+  bot-aprovacoes:
+    build:
+      context: ${PAINEL_SRC:-../../painel}
+    image: asttra-painel:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    command: ["node", "servidor/dist-scripts/bot-aprovacoes.mjs"]
+    # As migrações (tabela aprovacoes_telegram) rodam na subida do painel.
+    depends_on:
+      painel:
+        condition: service_healthy
+    mem_limit: 256m
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
     networks:
       - asttra
 

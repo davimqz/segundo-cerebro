@@ -1,9 +1,9 @@
-// Empacota os comandos de linha (migrar, usuario, aviso) em arquivos .mjs autocontidos, para rodarem
+// Empacota os comandos de linha (migrar, usuario, aviso) e o bot de aprovações em arquivos .mjs autocontidos, para rodarem
 // na imagem Docker sem TypeScript nem dependências de desenvolvimento. Usado pelo Dockerfile.
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["scripts/migrar.ts", "scripts/usuario.ts", "scripts/aviso.ts"],
+  entryPoints: ["scripts/migrar.ts", "scripts/usuario.ts", "scripts/aviso.ts", "scripts/bot-aprovacoes.ts"],
   outdir: "dist-scripts",
   outExtension: { ".js": ".mjs" },
   bundle: true,

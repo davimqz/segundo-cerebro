@@ -60,6 +60,9 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
   - Container em `/opt/asttra/hermes/`, a partir da imagem oficial fixada por digest, sem porta publicada, sem terminal e sem o socket do Docker.
   - O Paperclip o chama pelo `hermes_gateway` (`http://hermes:8642`), e o Hermes cria tarefas por um MCP próprio (`infra/hermes/mcp-paperclip/`).
   - Dados em `dados/`, no backup diário com a tag `hermes`.
+- **Aprovações:** implementadas na spec 006 (ADR 0008), ainda não implantadas.
+  - Tela `/aprovacoes` do painel e o bot de aprovações do Telegram (segundo bot), no serviço `bot-aprovacoes` de `/opt/asttra/painel/`, com a mesma imagem do painel e sem porta publicada.
+  - O painel decide com a chave de board `painel-aprovacoes` (sem validade), criada por `infra/painel/criar-chave-paperclip.sh` e guardada só no `.env` do painel.
 - **Subdomínio proposto:** `automacoes.` (n8n).
 - O IP do servidor não fica neste repositório. Peça ao Davi ou use o alias do `~/.ssh/config`.
 
@@ -98,7 +101,8 @@ Não use "Sustentação" como nome de departamento: é o nome do contrato mensal
 - Testes de integração: `scripts/teste-painel.sh` (PostgreSQL descartável) e `scripts/teste-banco.sh` (sobe `infra/banco` com senhas de teste); os dois rodam sempre no CI
 - Paperclip: `scripts/teste-paperclip.sh` sobe banco e Paperclip (imagem oficial por digest, ADR 0006) e testa admin, `configurar.sh` e aprovação. Fica fora do `check.sh` e, no CI, roda só quando `infra/paperclip` muda. No Git Bash, caminhos do container vão dentro de `sh -c`, e corpo JSON com acento vai pela entrada padrão do `curl`
 - Hermes: `scripts/teste-hermes.sh` sobe banco, Paperclip e Hermes e testa rede, `configurar.sh`, ferramentas desligadas e o MCP. Fica fora do `check.sh` e, no CI, roda só quando `infra/hermes` ou `infra/paperclip` muda. Os testes de unidade do MCP rodam no `check.sh`
-- E2E: `scripts/teste-e2e.sh` (sobe banco e painel pelo `infra/painel/compose.yml` e roda o Playwright; precisa de `pnpm --dir painel exec playwright install chromium`)
+- E2E: `scripts/teste-e2e.sh` (sobe banco, painel, bot e um Paperclip falso pelo `infra/painel/compose.yml` e roda o Playwright; precisa de `pnpm --dir painel exec playwright install chromium`)
+- Aprovações: o contrato do Paperclip que o painel usa é conferido no `scripts/teste-paperclip.sh`; o bot e as Server Actions têm testes de integração com Paperclip e Telegram falsos (`painel/src/test/falsos.ts`)
 
 ## Design
 
@@ -144,4 +148,5 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 6a (Hermes no Telegram): a spec 005 (R2) está implementada no PR do branch `feat/005-hermes`. Falta a implantação pelo playbook (capítulo Hermes, passos 68 a 79), com a escolha do modelo gratuito pelo Davi, e a verificação de ponta a ponta. Depois vem o item 6b (aprovações no painel e no Telegram, spec 006 a escrever).
+1. Etapa 1, item 6a (Hermes no Telegram): falta a implantação pelo playbook (capítulo Hermes, passos 68 a 79) e a verificação de ponta a ponta.
+2. Etapa 1, item 6b (aprovações no painel e no Telegram): a spec 006 (R2) está implementada no PR do branch `feat/006-aprovacoes`. Depois da aprovação do Davi, falta a implantação pelo playbook (capítulo Aprovações, passos 80 a 87) e a verificação de ponta a ponta.

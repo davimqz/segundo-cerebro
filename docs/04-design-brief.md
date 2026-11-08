@@ -95,7 +95,7 @@ Os componentes partem do [shadcn/ui](https://ui.shadcn.com) (componentes prontos
 | **Tag de departamento** | Texto em `label` na cor do departamento, fundo da mesma cor com 10% de opacidade, borda 1px, canto 2px |
 | **Status** | Ponto colorido + palavra ("Pendente", "Aprovado"), nunca só a cor |
 | **Card de indicador** | Sem fundo nem sombra, contornado por linhas de 1px; rótulo em `label`, valor em `metric`, variação em `small` |
-| **Item de aprovação** | Departamento, o que o agente quer fazer, prévia do conteúdo e três ações: Aprovar (botão primário), Editar, Recusar |
+| **Item de aprovação** | Tipo, o que o agente quer fazer, prévia do conteúdo, quem pediu e duas ações: Aprovar (botão primário) e Recusar, que abre o campo do motivo (spec 006; Editar ficou para depois) |
 | **Funil do CRM** | Colunas por etapa, cards arrastáveis com nome, empresa e valor |
 | **Aviso do sistema** | Faixa no topo da tela com `status-warning` ou `status-danger` (ex.: limite diário da IA atingido) |
 | **Botões** | Primário em `text` sobre `surface` invertido (preto no claro, branco no escuro); secundário com borda 1px |

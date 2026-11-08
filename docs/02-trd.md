@@ -64,6 +64,10 @@ Nenhum serviço é acessado diretamente pela internet: todo acesso web passa pel
   - O terminal em container separado (`terminal.backend docker`) fica para quando alguma tarefa precisar, com ADR próprio.
   - O gateway do Telegram só faz conexões de saída (long polling).
   - O Paperclip chama o Hermes pela API dele (porta 8642, com chave), e o Hermes fala com o Paperclip por um MCP próprio, com a chave de agente.
+- **Aprovações ([ADR 0008](adr/0008-bot-de-aprovacoes-e-chave-de-board-do-painel.md)):**
+  - O painel decide os pedidos do Paperclip com uma chave de board própria (`painel-aprovacoes`, sem validade), guardada só no `.env` do painel. O Hermes continua só com a chave de agente e não aprova nada.
+  - O bot de aprovações roda num segundo container do painel (`bot-aprovacoes`, mesma imagem), sem porta publicada. Ele busca o Telegram por long polling e confere o Paperclip a cada 10 segundos.
+  - A tela e o bot passam pelo mesmo caminho de decisão, que trava o pedido no PostgreSQL. Assim, a primeira decisão vale e fica uma só atividade.
 - **Segredos:** chaves de API, tokens e senhas ficam em arquivos `.env` fora do Git, com permissão restrita ao usuário do serviço. Nunca entram na base de conhecimento nem nas mensagens.
 - **Skills de terceiros:** só de publicadores verificados e após revisão do código.
 
@@ -97,7 +101,7 @@ O Hermes conversa com Davi; o n8n faz as integrações com serviços externos; o
 
 | Integração | Como conecta | Fase |
 | --- | --- | --- |
-| Telegram | Dois bots. O do Hermes, para conversar, com acesso restrito ao ID de Davi (spec 005). O do painel, só para aprovações (item 6b) | MVP |
+| Telegram | Dois bots. O do Hermes, para conversar, com acesso restrito ao ID de Davi (spec 005). O do painel, só para aprovações, com os botões Aprovar e Recusar e o mesmo acesso restrito (spec 006) | MVP |
 | Gmail, Google Agenda e Drive | n8n com OAuth do Google; o Hermes chama fluxos do n8n como ferramentas | MVP |
 | Paperclip | Adaptador `hermes_gateway` do Paperclip (o Paperclip chama a API do Hermes) e um MCP próprio com 3 ferramentas (o Hermes cria e lê tarefas). Spec 005 | MVP |
 | Construção de fluxos | `n8n-mcp` + skills `n8n-skills`, usados pelo Claude Code para criar fluxos que Davi revisa | MVP |

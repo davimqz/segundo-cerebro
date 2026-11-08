@@ -126,6 +126,69 @@ test("carregar e ativar um tema muda o fundo do painel, e o Selecta volta no fim
   await expect.poll(fundo).toBe(fundoSelecta);
 });
 
+test("Aprovações: lista o pendente, aprova, exige o motivo para recusar e mostra o histórico", async ({
+  page,
+  request,
+}) => {
+  // Pedidos criados no Paperclip falso (scripts/teste-e2e.sh), como um agente faria.
+  const criar = async (titulo: string) => {
+    const r = await request.post(`${process.env.E2E_PAPERCLIP}/teste/pedidos`, {
+      headers: { authorization: `Bearer ${process.env.E2E_PAPERCLIP_CHAVE}` },
+      data: { payload: { titulo, descricao: "Pedido do teste E2E.", valor: 50 } },
+    });
+    expect(r.status()).toBe(201);
+  };
+  const sufixo = Date.now();
+  const tituloA = `Aprovar E2E ${sufixo}`;
+  const tituloB = `Recusar E2E ${sufixo}`;
+  await criar(tituloA);
+  await criar(tituloB);
+
+  // IP próprio: o login aceita 5 tentativas por IP a cada 15 minutos, e os outros testes já usam o padrão.
+  await page.context().setExtraHTTPHeaders({ "cf-connecting-ip": "198.51.100.8" });
+  await entrar(page);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Visão geral");
+  await page.goto("/aprovacoes");
+  const pendente = (t: string) => page.getByTestId("pendente").filter({ hasText: t });
+  const decidido = (t: string) => page.getByTestId("decidido").filter({ hasText: t });
+
+  await expect(pendente(tituloA)).toContainText("Pedido do teste E2E.");
+  await expect(pendente(tituloA)).toContainText("valor:");
+  await expect(pendente(tituloA)).toContainText("Pedido por board");
+
+  await pendente(tituloA)
+    .getByRole("button", { name: /^Aprovar/ })
+    .click();
+  await expect(page.getByRole("status").filter({ hasText: `${tituloA}: Aprovado às` })).toBeVisible();
+  await expect(pendente(tituloA)).toHaveCount(0);
+  await expect(decidido(tituloA)).toContainText("Aprovado");
+  await expect(decidido(tituloA)).toContainText("no painel");
+
+  await pendente(tituloB)
+    .getByRole("button", { name: /^Recusar/ })
+    .click();
+  const motivo = pendente(tituloB).getByLabel("Motivo da recusa");
+  await expect(motivo).toBeVisible();
+  // Sem motivo, não envia.
+  await pendente(tituloB).getByRole("button", { name: "Confirmar recusa" }).click();
+  await expect(motivo).toBeVisible();
+  await expect(decidido(tituloB)).toHaveCount(0);
+  await motivo.fill("Fora do tom da marca");
+  await pendente(tituloB).getByRole("button", { name: "Confirmar recusa" }).click();
+  await expect(decidido(tituloB)).toContainText("Recusado");
+  await expect(decidido(tituloB)).toContainText("Motivo: Fora do tom da marca");
+  await expect(pendente(tituloB)).toHaveCount(0);
+
+  // A tela se atualiza sozinha: um pedido novo aparece sem recarregar.
+  const tituloC = `Novo E2E ${sufixo}`;
+  await criar(tituloC);
+  await expect(pendente(tituloC)).toBeVisible({ timeout: 20_000 });
+
+  await page.goto("/atividades");
+  await expect(page.getByTestId("atividade").filter({ hasText: "aprovacao_aprovada" }).first()).toBeVisible();
+  await expect(page.getByTestId("atividade").filter({ hasText: "aprovacao_recusada" }).first()).toBeVisible();
+});
+
 test("Sair volta para /entrar e a sessão deixa de valer", async ({ page }) => {
   await entrar(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Visão geral");
