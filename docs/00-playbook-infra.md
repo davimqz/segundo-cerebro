@@ -797,6 +797,88 @@ O `configurar.sh` recopia o `config.yaml` e o `SOUL.md` para `dados/`. Para volt
 
 Edite a linha no `.env` com `sudo nano /opt/asttra/hermes/.env` e recrie o container (`sudo docker compose up -d --force-recreate --wait`). Se trocar a `API_SERVER_KEY`, rode também `sudo HERMES_TROCAR_CHAVE_API=1 /opt/asttra/hermes/configurar.sh`, para o Paperclip receber a chave nova.
 
+## Aprovações
+
+Os pedidos de aprovação dos agentes ficam no Paperclip. Davi os decide na tela Aprovações do painel ou num **segundo bot do Telegram**, o bot de aprovações (não é o do Hermes). A primeira decisão vale, e o outro lugar mostra quem decidiu. Toda decisão fica em Atividades. Spec: [`specs/006-aprovacoes-no-painel-e-no-telegram.md`](specs/006-aprovacoes-no-painel-e-no-telegram.md). Decisão: [ADR 0008](adr/0008-bot-de-aprovacoes-e-chave-de-board-do-painel.md).
+
+No servidor:
+- O bot roda no serviço `bot-aprovacoes` de `/opt/asttra/painel`, com a mesma imagem do painel. Ele busca as mensagens no Telegram (long polling) e confere o Paperclip a cada 10 segundos. Não tem porta publicada nem rota no tunnel.
+- O `.env` do painel ganha a **chave de board** `painel-aprovacoes` do Paperclip, criada sem validade. Quem tem essa chave pode aprovar e configurar a empresa no Paperclip: ela fica só nesse `.env`.
+
+**Antes de começar:** o PR da spec 006 precisa estar na `main`, e o painel e o Paperclip precisam estar no ar.
+
+### Instalação
+
+80. **Criar o bot de aprovações** (celular). No `@BotFather`, mande `/newbot`. Dê um nome (por exemplo, "Aprovações Asttra") e um usuário terminado em `bot`. Guarde o token no gerenciador como "Telegram – bot de aprovações". Depois mande `/setjoingroups`, escolha o bot e marque `Disable`. Por fim, abra a conversa com o bot novo e toque em **Iniciar** (`/start`): sem isso, o Telegram não deixa o bot mandar a primeira mensagem.
+81. **Conferir o seu ID do Telegram** (celular). É o mesmo número do passo 69 (`@userinfobot`). Só ele vai poder aprovar pelo bot.
+82. **Liberar o nome interno do Paperclip** (no servidor). O painel e o bot chamam o Paperclip por `http://paperclip:3100`. Se o passo 72 já foi feito, o comando não muda nada. A linha mostrada deve terminar com `,paperclip`.
+
+```bash
+cd /opt/asttra/paperclip
+sudo sed -i '/^PAPERCLIP_ALLOWED_HOSTNAMES=/{/,paperclip$/!s#$#,paperclip#}' .env
+sudo grep '^PAPERCLIP_ALLOWED_HOSTNAMES=' .env
+sudo docker compose up -d --wait
+```
+
+83. **Copiar os arquivos novos** (no servidor). O `.env` do painel não é tocado.
+
+```bash
+cd /opt/asttra/painel-src && git pull
+sudo cp /opt/asttra/painel-src/infra/painel/{compose.yml,criar-chave-paperclip.sh} /opt/asttra/painel/
+sudo chmod 755 /opt/asttra/painel/criar-chave-paperclip.sh
+```
+
+84. **Gravar o bot no `.env` do painel** (no servidor). O token é colado com o **botão direito do mouse** e não aparece na tela; o comando mostra só quantos caracteres recebeu. Rodar de novo troca os valores.
+
+```bash
+sudo bash -c 'cd /opt/asttra/painel
+read -rsp "Token do bot de aprovações (BotFather): " TG; echo " -> ${#TG} caracteres (esperado 46)"
+read -rp "Seu ID do Telegram (só números): " ID
+[[ $TG == *:* && $ID =~ ^[0-9]+$ ]] || { echo "Formato errado, nada foi gravado."; exit 1; }
+sed -i -E "/^(PAPERCLIP_URL|TELEGRAM_APROVACOES_TOKEN|TELEGRAM_APROVACOES_CHAT_ID)=/d" .env
+printf "PAPERCLIP_URL=http://paperclip:3100\nTELEGRAM_APROVACOES_TOKEN=%s\nTELEGRAM_APROVACOES_CHAT_ID=%s\n" "$TG" "$ID" >> .env
+echo "Gravado."'
+sudo cut -d= -f1 /opt/asttra/painel/.env
+```
+
+85. **Criar a chave de board do painel** (no servidor, depois no navegador). O script mostra um link de acesso: aprove-o como no passo 64. Ele cria a chave `painel-aprovacoes` sem validade, grava `PAPERCLIP_CHAVE_BOARD` e `PAPERCLIP_EMPRESA_ID` no `.env` sem mostrar a chave e revoga a chave temporária. O resultado deve terminar com "Chave temporária revogada".
+
+```bash
+sudo /opt/asttra/painel/criar-chave-paperclip.sh
+```
+
+86. **Subir e conferir** (no servidor). O build leva alguns minutos; faça fora do horário de uso. Confira estes resultados:
+    - `painel` aparece como `healthy` e `bot-aprovacoes` como `running`;
+    - o `PortBindings` do bot aparece como `{}`;
+    - o log do bot mostra "no ar", sem erro;
+    - a última linha mostra `0`: nenhuma chave ou token apareceu no log.
+
+```bash
+cd /opt/asttra/painel
+sudo docker compose up -d --build --wait
+sudo docker compose ps
+sudo docker inspect --format '{{json .HostConfig.PortBindings}}' "$(sudo docker compose ps -q bot-aprovacoes)"
+sudo docker compose logs bot-aprovacoes | tail -20
+sudo docker compose logs bot-aprovacoes | grep -c -E 'pcp_board_|bot[0-9]+:'
+```
+
+87. **Teste de ponta a ponta (o "Pronto quando")** (servidor, navegador e celular). Siga a "Verificação de ponta a ponta" da spec 006:
+    1. No servidor, rode o comando abaixo. Em até ~15 segundos, o pedido deve aparecer na tela Aprovações e chegar no Telegram, com os botões Aprovar e Recusar. O script mostra um link de acesso: aprove-o como no passo 64.
+    2. Aprove no painel. O script deve imprimir `approved`, e a mensagem no Telegram deve virar "Aprovado no painel às HH:MM", sem botões.
+    3. Rode de novo com `TITULO="Teste 006 – Telegram"` e aprove pelo botão no Telegram. O script deve imprimir `approved`, e o pedido deve ir para "Últimos decididos" no painel com "no Telegram".
+    4. Crie um terceiro pedido, toque em Recusar e responda à pergunta com um motivo. O script deve mostrar `Status do pedido: rejected` (e terminar com erro, porque espera `approved`). O motivo deve aparecer no histórico e em Atividades.
+    5. Em Atividades, confira as três decisões (`aprovacao_aprovada` e `aprovacao_recusada`). Rode de novo a última linha do passo 86: deve mostrar `0`.
+    6. De outra conta do Telegram, escreva ao bot. Nada deve acontecer.
+
+```bash
+sudo TITULO="Teste 006 – painel" /opt/asttra/paperclip/teste-aprovacao.sh
+```
+
+### Trocar a chave ou o token do bot
+
+- **Chave de board:** rode de novo `sudo /opt/asttra/painel/criar-chave-paperclip.sh`. Ele cria uma chave nova e revoga a anterior. Depois, `cd /opt/asttra/painel && sudo docker compose up -d`.
+- **Token do bot:** no `@BotFather`, use `/revoke` para gerar outro. Repita o passo 84 e rode `sudo docker compose up -d` em `/opt/asttra/painel`.
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -815,6 +897,8 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - **Telegram – bot do Hermes**: o token do `@BotFather` (passo 68).
 - **OpenRouter – chave do Hermes**: a chave da conta sem créditos (passo 70).
 - A `API_SERVER_KEY` do Hermes e a chave de agente do Paperclip ficam só em `/opt/asttra/hermes/.env` (geradas no servidor). A `API_SERVER_KEY` também fica guardada como segredo do Paperclip (`hermes-api-key`).
+- **Telegram – bot de aprovações**: o token do segundo bot (passo 80).
+- A chave de board `painel-aprovacoes` do Paperclip fica só em `/opt/asttra/painel/.env` (passo 85). Não vai para o gerenciador: se perder, rode o script de novo.
 
 Se a chave for perdida, o acesso é recuperado pelo terminal do painel do provedor, instalando uma nova chave pública.
 
@@ -859,6 +943,10 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 | O Hermes avisa que o limite acabou ou não responde a nada | O limite diário dos modelos gratuitos do OpenRouter acabou | Esperar o dia seguinte. Não compre créditos sem aprovação (regra de custo) |
 | O log do Hermes mostra erro 404 ou "no endpoints" no OpenRouter | O modelo saiu do ar, ou nenhum provedor dele aceita `data_collection: deny` | Escolher outro modelo (passo 71) e trocar ("Trocar o modelo ou um token") |
 | `configurar.sh` do Hermes fica esperando a aprovação da contratação | O pedido `hire_agent` não foi aprovado no Paperclip | Abrir Approvals no Paperclip e aprovar; o script espera até 10 minutos |
+| O bot de aprovações não manda nada e o log mostra "chat not found" ou "Forbidden" | Davi não iniciou a conversa com o bot, ou o ID está errado | Tocar em Iniciar na conversa com o bot (passo 80) e conferir o ID (passo 81) |
+| A tela Aprovações mostra "O Paperclip recusou a chave do painel" | A chave `painel-aprovacoes` foi revogada ou o `.env` perdeu a linha | Rodar de novo o `criar-chave-paperclip.sh` (passo 85) e `sudo docker compose up -d` |
+| A tela Aprovações diz "Não consegui falar com o Paperclip" ou dá "HTTP 403" | O Paperclip está parado, ou falta `paperclip` em `PAPERCLIP_ALLOWED_HOSTNAMES` | `sudo docker compose ps` em `/opt/asttra/paperclip` e o passo 82 |
+| O log do bot mostra "Conflict: terminated by other getUpdates request" | Há dois processos usando o mesmo token (por exemplo, o token do Hermes no lugar do bot de aprovações) | Conferir que os dois bots têm tokens diferentes (passos 68 e 80) |
 | O subdomínio do tunnel não abre (DNS não existe) | A rota não foi criada na tela de criação do tunnel | Na tela de criação do tunnel, clicar em Continue e criar a rota em Routes > Add route; sem isso o DNS do subdomínio não existe |
 
 ## Próximos passos
@@ -873,4 +961,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53 executados em 02/11/2026)
 - [x] Paperclip no ar em `agentes.asttralabs.com.br` (Etapa 1, item 5: passos 54 a 67 executados em 03/11/2026)
 - [ ] Hermes no Telegram (Etapa 1, item 6a: passos 68 a 79)
+- [ ] Aprovações no painel e no Telegram (Etapa 1, item 6b: passos 80 a 87)
 - [x] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; primeiro backup automático das 03:00 confirmado em 03/11/2026)

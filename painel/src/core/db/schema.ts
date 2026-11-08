@@ -107,6 +107,21 @@ export const configuracoes = pgTable("configuracoes", {
   valor: jsonb("valor").notNull(),
 });
 
+// ─── Aprovações (spec 006) ──────────────────────────────────────────────────────
+// Os pedidos vivem no Paperclip. Aqui fica só o estado do bot de aprovações do Telegram: a mensagem
+// mandada para cada pedido (uma vez só) e a pergunta de motivo aberta, se houver.
+
+export const aprovacoesTelegram = pgTable("aprovacoes_telegram", {
+  aprovacaoId: text("aprovacao_id").primaryKey(),
+  // Vazio só se o envio caiu no meio; o pedido não é mandado de novo.
+  mensagemId: bigint("mensagem_id", { mode: "number" }),
+  perguntaMotivoId: bigint("pergunta_motivo_id", { mode: "number" }),
+  // Último status do pedido que o bot já mostrou na mensagem (pending, approved, rejected...).
+  statusVisto: text("status_visto").notNull().default("pending"),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ─── Login (Better Auth, ADR 0004) ──────────────────────────────────────────────
 // Os nomes das propriedades seguem os campos do Better Auth; as tabelas e colunas, o padrão do banco.
 

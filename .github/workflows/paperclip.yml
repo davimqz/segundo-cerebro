@@ -8,12 +8,14 @@ on:
       - "infra/paperclip/**"
       - "infra/banco/**"
       - "scripts/teste-paperclip.sh"
+      - "infra/painel/criar-chave-paperclip.sh"
       - ".github/workflows/paperclip.yml"
   push:
     branches: [main]
     paths:
       - "infra/paperclip/**"
       - "scripts/teste-paperclip.sh"
+      - "infra/painel/criar-chave-paperclip.sh"
       - ".github/workflows/paperclip.yml"
 
 permissions:

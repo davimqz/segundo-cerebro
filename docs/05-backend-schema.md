@@ -45,6 +45,13 @@ O login (Better Auth, [ADR 0004](adr/0004-login-do-painel-com-better-auth.md)) t
 
 Ações gravadas em `atividades` pelo núcleo: `login`, `logout`, `senha_trocada`, `usuario_criado`, `aviso_criado` e `aviso_resolvido`.
 
+**Aprovações (spec 006).** Os pedidos continuam no Paperclip. O painel tem só a tabela `aprovacoes_telegram`, com o estado do bot de aprovações: aprovacao_id (chave), mensagem_id, pergunta_motivo_id (vazio sem pergunta aberta), status_visto, criado_em e atualizado_em. Cada decisão grava em `atividades`:
+- `aprovacao_aprovada` ou `aprovacao_recusada`, com `alvo` igual ao id do pedido no Paperclip;
+- `detalhes.origem`: `painel`, `telegram` ou `paperclip`, além do tipo, do título e, na recusa, do motivo;
+- o autor é do tipo `usuario`: o id do usuário do painel, `telegram:<id do Telegram>` ou `paperclip:<id do usuário no Paperclip>`.
+
+Quando o Paperclip ou o Telegram caem, o painel e o bot abrem um único aviso por serviço (origens `aprovacoes:paperclip` e `aprovacoes:telegram`) e o resolvem sozinhos quando a conexão volta.
+
 Regras:
 
 - `atividades` só recebe inclusões: nada é editado nem apagado, para servir de trilha de auditoria. Um gatilho no PostgreSQL recusa `UPDATE`, `DELETE` e `TRUNCATE`.
