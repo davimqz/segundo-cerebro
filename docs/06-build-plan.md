@@ -58,14 +58,15 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
      - backup com a tag `paperclip` e restauração que confirma a `master.key`;
      - pedido `request_board_approval` de teste aprovado pela tela, com a chave temporária revogada;
      - dados mantidos depois de recriar o container.
-6. **Hermes no Telegram:** com modelos gratuitos, execução isolada e ligado ao Paperclip. Dividido em duas partes por Davi em 2026-11-03.
+6. [x] **Hermes no Telegram:** com modelos gratuitos, execução isolada e ligado ao Paperclip. Dividido em duas partes por Davi em 2026-11-03.
    - [x] **6a. Hermes no Telegram:** container próprio sem terminal, modelo `:free` do OpenRouter, confirmação antes de agir e tarefas criadas no Paperclip pelo `hermes_gateway`.
      - Pronto quando: Davi pede uma tarefa no Telegram, o Hermes confirma o que entendeu e, depois do "sim", a tarefa aparece no Paperclip.
      - Spec: [005](specs/005-hermes-no-telegram.md). ADR [0007](adr/0007-hermes-em-container-proprio-sem-terminal.md). PRs #30, #31 e #32. Implantação em `infra/hermes/`; passo a passo no playbook, capítulo "Hermes".
      - Concluído em 2026-11-08: implantado no servidor com o modelo `nvidia/nemotron-3-ultra-550b-a55b:free` e conferido por Davi de ponta a ponta (pedido no Telegram, confirmação do Hermes e tarefa criada no Paperclip depois do "sim").
-   - **6b. Aprovações no painel e no Telegram:** tela Aprovações do painel e um segundo bot, do painel, com os botões Aprovar/Recusar. O primeiro "sim" ou "não" vale, e o outro lugar mostra quem decidiu. A decisão fica registrada em Atividades. O poder de aprovar fica no painel, nunca no Hermes.
+   - [x] **6b. Aprovações no painel e no Telegram:** tela Aprovações do painel e um segundo bot, do painel, com os botões Aprovar/Recusar. O primeiro "sim" ou "não" vale, e o outro lugar mostra quem decidiu. A decisão fica registrada em Atividades. O poder de aprovar fica no painel, nunca no Hermes.
      - Pronto quando: um pedido de aprovação aparece no painel e no Telegram ao mesmo tempo; Davi aprova num deles e o outro se atualiza.
-     - Spec: [006](specs/006-aprovacoes-no-painel-e-no-telegram.md).
+     - Spec: [006](specs/006-aprovacoes-no-painel-e-no-telegram.md). ADR [0008](adr/0008-bot-de-aprovacoes-e-chave-de-board-do-painel.md). PR #34. Implantação em `infra/painel/` (serviço `bot-aprovacoes`); passo a passo no playbook, capítulo "Aprovações".
+     - Concluído em 2026-11-08: implantado no servidor (bot sem porta publicada, nenhuma chave ou token nos logs) e conferido por Davi de ponta a ponta: pedido no painel e no Telegram ao mesmo tempo, aprovação no painel atualizando o Telegram, aprovação no Telegram atualizando o painel, recusa com motivo no histórico e as decisões em Atividades. Falta conferir, de outra conta do Telegram, que o bot ignora a mensagem (coberto pelos testes automáticos).
 7. **Ponte do Hermes com o painel (servidor MCP):** o Hermes consulta e age no painel, registrando tudo em Atividades.
    - Pronto quando: um pedido no Telegram cria um registro no painel.
 8. **n8n:** instalado, com `n8n-mcp`, ligado ao Gmail, Google Agenda e Google Drive.

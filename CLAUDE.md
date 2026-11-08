@@ -61,7 +61,7 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
   - Container em `/opt/asttra/hermes/`, a partir da imagem oficial fixada por digest, sem porta publicada, sem terminal e sem o socket do Docker.
   - O Paperclip o chama pelo `hermes_gateway` (`http://hermes:8642`), e o Hermes cria tarefas por um MCP próprio (`infra/hermes/mcp-paperclip/`).
   - Dados em `dados/`, no backup diário com a tag `hermes`.
-- **Aprovações:** implementadas na spec 006 (ADR 0008), ainda não implantadas.
+- **Aprovações:** no ar desde 2026-11-08 (spec 006, ADR 0008), testadas de ponta a ponta no painel e no Telegram.
   - Tela `/aprovacoes` do painel e o bot de aprovações do Telegram (segundo bot), no serviço `bot-aprovacoes` de `/opt/asttra/painel/`, com a mesma imagem do painel e sem porta publicada.
   - O painel decide com a chave de board `painel-aprovacoes` (sem validade), criada por `infra/painel/criar-chave-paperclip.sh` e guardada só no `.env` do painel.
 - **Subdomínio proposto:** `automacoes.` (n8n).
@@ -149,4 +149,5 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 6b (aprovações no painel e no Telegram): a spec 006 (R2) está implementada no PR do branch `feat/006-aprovacoes`. Depois da aprovação do Davi, falta a implantação pelo playbook (capítulo Aprovações, passos 80 a 87) e a verificação de ponta a ponta. O item 6a (Hermes no Telegram) foi concluído em 2026-11-08.
+1. Etapa 1, item 7 (ponte do Hermes com o painel, servidor MCP): escrever a spec 007 com `/asttra:feature`. O item 6 (Hermes no Telegram e aprovações) foi concluído em 2026-11-08.
+2. Pendente do item 6b: conferir, de outra conta do Telegram, que o bot de aprovações ignora a mensagem (passo 87.6 do playbook).

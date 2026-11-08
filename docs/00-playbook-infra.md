@@ -960,6 +960,6 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Cloudflare na frente dos serviços, sem portas abertas (Tunnel e Access)
 - [x] Painel no ar em `painel.asttralabs.com.br` (Etapa 1, item 3: passos 43 a 53 executados em 02/11/2026)
 - [x] Paperclip no ar em `agentes.asttralabs.com.br` (Etapa 1, item 5: passos 54 a 67 executados em 03/11/2026)
-- [ ] Hermes no Telegram (Etapa 1, item 6a: passos 68 a 79)
-- [ ] Aprovações no painel e no Telegram (Etapa 1, item 6b: passos 80 a 87)
+- [x] Hermes no Telegram (Etapa 1, item 6a: passos 68 a 79 executados em 08/11/2026)
+- [x] Aprovações no painel e no Telegram (Etapa 1, item 6b: passos 80 a 87 executados em 08/11/2026; falta o teste com outra conta do Telegram, passo 87.6)
 - [x] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; primeiro backup automático das 03:00 confirmado em 03/11/2026)

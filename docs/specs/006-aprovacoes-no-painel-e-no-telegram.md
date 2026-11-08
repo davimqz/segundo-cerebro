@@ -2,7 +2,7 @@
 
 - Risco: R2
 - Origem: Build Plan, Etapa 1, item 6b; PRD, RF02 e "Regra base de aprovação"; TRD, "Integrações" (dois bots) e "Dados"; App Flow, "Fluxo de aprovação" e "Aprovar pelo celular"
-- Status: Implementada (falta a implantação, passos 80 a 87 do playbook)
+- Status: Concluída em 2026-11-08 (implantada e verificada de ponta a ponta; falta o teste com outra conta do Telegram)
 
 ## Objetivo
 Os pedidos de aprovação dos agentes ficam no Paperclip (TRD, "Dados"). Este item faz Davi decidir esses pedidos em dois lugares: na tela Aprovações do painel e num segundo bot do Telegram, o bot de aprovações. A primeira decisão vale, e o outro lugar mostra quem decidiu. Toda decisão fica em `atividades`. O poder de aprovar fica no painel; o Hermes não ganha esse poder.
