@@ -21,5 +21,9 @@ Os pedidos de aprovação vivem no Paperclip. O item 6b faz Davi decidir esses p
 ## Consequências
 - Quem tem a chave tem o poder de board no Paperclip: aprova, recusa e configura a empresa. Ela fica só no `.env` do painel (permissão 600, fora do Git) e nunca aparece em log, em `atividades` ou nas mensagens. Para revogar, use Configurações > Acesso no Paperclip ou rode o script de novo.
 - O painel e o bot dependem do Paperclip para mostrar e decidir pedidos. Cada chamada tem tempo-limite de 5 segundos, para a tela Aprovações não deixar o resto do painel lento.
+- A trava do pedido segura uma conexão do banco enquanto o Paperclip responde (até 3 chamadas de 5 segundos). Para um usuário só, o pool de 10 conexões basta.
+- Caso raro: se o Paperclip aplicar a decisão e a gravação da atividade falhar, a atividade é gravada depois pelo bot com `origem = "paperclip"`, e a origem real se perde. A trilha continua existindo.
+- O bot envia cada pedido uma vez. Se o container cair entre a reserva e o envio, o pedido é mandado de novo depois de 1 minuto. Se cair logo depois do envio, a mensagem pode chegar duas vezes: é melhor que não chegar.
+- O bot lê o mesmo `.env` do painel, inclusive o `BETTER_AUTH_SECRET` e a senha do banco, porque usa o banco e a mesma imagem.
 - O container do bot gasta até 256 MB de RAM.
 - **Gatilho para rever:** o Paperclip passar a oferecer chaves de board com escopo menor (por exemplo, só aprovações); ou o painel ganhar outro processo de fundo, que poderia rodar junto com o bot.

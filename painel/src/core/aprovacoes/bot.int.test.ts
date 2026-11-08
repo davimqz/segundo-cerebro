@@ -293,6 +293,42 @@ describe("bot de aprovações", () => {
   });
 });
 
+describe("bot de aprovações: recuperação", () => {
+  it("o aviso do Telegram some quando a conexão volta, mesmo sem pedido novo para mandar", async () => {
+    const p = pc.criar({ titulo: "Falha passageira" });
+    const bot = novoBot();
+    tg.estado.fora = true;
+    try {
+      await bot.cicloPaperclip();
+      expect(await avisosAbertos(AVISO_TELEGRAM)).toHaveLength(1);
+    } finally {
+      tg.estado.fora = false;
+    }
+    // Decidido no Paperclip enquanto o Telegram estava fora: não sobra nada para mandar.
+    pc.decidirNoPaperclip(p.id, "approved");
+    await bot.cicloTelegram(0);
+    await bot.cicloPaperclip();
+    expect(await avisosAbertos(AVISO_TELEGRAM)).toHaveLength(0);
+  });
+
+  it("reserva sem mensagem há mais de 1 minuto é mandada de novo; a recente, não", async () => {
+    const antigo = pc.criar({ titulo: "Envio perdido" });
+    const recente = pc.criar({ titulo: "Envio em andamento" });
+    await banco()
+      .insert(aprovacoesTelegram)
+      .values([{ aprovacaoId: antigo.id, criadoEm: new Date(Date.now() - 2 * 60_000) }, { aprovacaoId: recente.id }]);
+    const bot = novoBot();
+    await bot.cicloPaperclip();
+    await bot.cicloPaperclip();
+
+    const envios = tg.de("sendMessage");
+    expect(envios).toHaveLength(1);
+    expect(String(envios[0].corpo.text)).toContain("Envio perdido");
+    expect((await registroDe(antigo.id)).mensagemId).toBeGreaterThan(0);
+    expect((await registroDe(recente.id)).mensagemId).toBeNull();
+  });
+});
+
 describe("decidirAprovacao", () => {
   it("dois cliques ao mesmo tempo gravam uma atividade só", async () => {
     const p = pc.criar({ titulo: "Corrida" });

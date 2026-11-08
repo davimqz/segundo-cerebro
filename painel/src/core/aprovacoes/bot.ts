@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { garantirAviso, resolverAvisosDe } from "../avisos/servico";
 import { banco } from "../db/client";
 import { aprovacoesTelegram } from "../db/schema";
@@ -25,6 +25,8 @@ import { anotarSaudeDoPaperclip, decidirAprovacao, registrarDecisaoExterna } fro
 // O estado fica na tabela aprovacoes_telegram, para sobreviver a um reinício do container.
 
 export const AVISO_TELEGRAM = "aprovacoes:telegram";
+/** Depois disso, uma reserva sem mensagem é tratada como envio perdido. */
+export const RESERVA_PERDIDA_MS = 60_000;
 
 type Registro = { info: (m: string) => void; erro: (m: string) => void };
 
@@ -109,30 +111,46 @@ export function criarBot(d: DependenciasDoBot) {
     const conhecidos = new Map((await banco().select().from(aprovacoesTelegram)).map((r) => [r.aprovacaoId, r]));
     const idsPendentes = new Set(pendentes.aprovacoes.map((a) => a.id));
 
-    const novos = pendentes.aprovacoes.filter((a) => !conhecidos.has(a.id));
+    // Uma reserva sem mensagem há mais de 1 minuto é de um envio que caiu no meio: manda de novo.
+    // (Se a queda foi depois do envio, a mensagem sai duas vezes; é melhor que nunca chegar.)
+    const limiteReserva = Date.now() - RESERVA_PERDIDA_MS;
+    const perdida = (id: string) => {
+      const r = conhecidos.get(id);
+      return !!r && r.mensagemId === null && r.perguntaMotivoId === null && r.criadoEm.getTime() < limiteReserva;
+    };
+    const novos = pendentes.aprovacoes.filter((a) => !conhecidos.has(a.id) || perdida(a.id));
     const agentes = novos.some((a) => a.requestedByAgentId) ? await nomesDosAgentes(d.paperclip) : undefined;
+    let usouTelegram = false;
     for (const a of novos) {
       // Reserva antes de mandar: se o container cair no meio, o pedido não é mandado duas vezes.
-      const [reservado] = await banco()
-        .insert(aprovacoesTelegram)
-        .values({ aprovacaoId: a.id })
-        .onConflictDoNothing()
-        .returning();
+      const [reservado] = perdida(a.id)
+        ? await banco()
+            .update(aprovacoesTelegram)
+            .set({ criadoEm: new Date(), atualizadoEm: new Date() })
+            .where(and(eq(aprovacoesTelegram.aprovacaoId, a.id), isNull(aprovacoesTelegram.mensagemId)))
+            .returning()
+        : await banco().insert(aprovacoesTelegram).values({ aprovacaoId: a.id }).onConflictDoNothing().returning();
       if (!reservado) continue;
+      usouTelegram = true;
+      let mensagemId: number;
       try {
         const texto = mensagemDoPedido(a, {
           solicitante: solicitanteDe(a, agentes),
           link: linkDoPedido(d.urlPainel, a.id),
         });
-        const m = await d.telegram.sendMessage(d.chatId, texto, { botoes: botoesDoPedido(a.id) });
-        await atualizarRegistro(a.id, { mensagemId: m.message_id });
-        log.info(`pedido ${a.id} mandado`);
-        await anotarTelegram("envio", null);
+        mensagemId = (await d.telegram.sendMessage(d.chatId, texto, { botoes: botoesDoPedido(a.id) })).message_id;
       } catch (e) {
         // Não mandou: libera a reserva para tentar no próximo ciclo.
         await banco().delete(aprovacoesTelegram).where(eq(aprovacoesTelegram.aprovacaoId, a.id));
         await anotarTelegram("envio", e);
+        continue;
       }
+      // Já mandou: uma falha ao gravar não pode liberar a reserva (mandaria de novo).
+      await atualizarRegistro(a.id, { mensagemId }).catch((e) =>
+        log.erro(`pedido ${a.id}: mensagem mandada, mas não gravada: ${e instanceof Error ? e.message : e}`),
+      );
+      log.info(`pedido ${a.id} mandado`);
+      await anotarTelegram("envio", null);
     }
 
     for (const r of conhecidos.values()) {
@@ -144,6 +162,7 @@ export function criarBot(d: DependenciasDoBot) {
       }
       if (atual.aprovacao.status === "pending") continue;
       const origem = (await registrarDecisaoExterna(atual.aprovacao)) ?? null;
+      usouTelegram = true;
       try {
         await mostrarDecidido(atual.aprovacao, origem);
         await anotarTelegram("envio", null);
@@ -151,6 +170,10 @@ export function criarBot(d: DependenciasDoBot) {
         await anotarTelegram("envio", e);
       }
     }
+
+    // Nada para mandar neste ciclo: uma falha de envio antiga não segura o aviso aberto. Uma falha que
+    // continua (pedido sem conseguir sair) é tentada de novo a cada ciclo e mantém o aviso.
+    if (!usouTelegram) await anotarTelegram("envio", null);
   }
 
   function ehDoDavi(id: number | undefined) {
