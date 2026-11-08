@@ -56,7 +56,8 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
   - Container em `/opt/asttra/paperclip/`, a partir da imagem oficial fixada por digest e sem as CLIs (ADR 0006). Porta só em `127.0.0.1:18100`.
   - Dados e `master.key` em `dados/`, no backup diário com a tag `paperclip`.
   - Empresa "Asttra Labs" com o prefixo `AST`.
-- **Hermes:** implementado na spec 005 (ADR 0007), ainda não implantado.
+- **Hermes:** no ar desde 2026-11-08 (spec 005, ADR 0007), testado de ponta a ponta pelo Telegram.
+  - Modelo `nvidia/nemotron-3-ultra-550b-a55b:free`, com `data_collection: allow`: não mande ao Hermes dados pessoais nem informação confidencial de clientes.
   - Container em `/opt/asttra/hermes/`, a partir da imagem oficial fixada por digest, sem porta publicada, sem terminal e sem o socket do Docker.
   - O Paperclip o chama pelo `hermes_gateway` (`http://hermes:8642`), e o Hermes cria tarefas por um MCP próprio (`infra/hermes/mcp-paperclip/`).
   - Dados em `dados/`, no backup diário com a tag `hermes`.
@@ -144,4 +145,4 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 6a (Hermes no Telegram): a spec 005 (R2) está implementada no PR do branch `feat/005-hermes`. Falta a implantação pelo playbook (capítulo Hermes, passos 68 a 79), com a escolha do modelo gratuito pelo Davi, e a verificação de ponta a ponta. Depois vem o item 6b (aprovações no painel e no Telegram, spec 006 a escrever).
+1. Etapa 1, item 6b (aprovações no painel e no Telegram): escrever a spec 006 (R2) com `/asttra:feature`. O item 6a (Hermes no Telegram) foi concluído em 2026-11-08.
