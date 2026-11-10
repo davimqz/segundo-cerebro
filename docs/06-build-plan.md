@@ -113,6 +113,9 @@ Ideias das aprovações (da spec 006), para Davi decidir:
 - **Botão Editar:** usar o "pedir revisão" do Paperclip para devolver o pedido ao agente com o que mudar.
 - **`pedir_aprovacao` no Hermes:** uma ferramenta no MCP do Hermes para ele criar pedidos de aprovação. Deve entrar junto com a primeira ação real (o e-mail, no item 9).
 
+Ideias da ponte do Hermes (da spec 007), para Davi decidir:
+- **Hermes cria avisos:** "me lembra no painel que o certificado vence sexta" vira um aviso na faixa do topo (opção 1B).
+
 Ideias do Paperclip (da spec 004), para Davi decidir:
 - **Backup interno do Paperclip:** ele copia o próprio banco a cada hora para a pasta de dados, e isso também entra no restic. Pode ser desligado com `PAPERCLIP_DB_BACKUP_ENABLED=false`.
 - **Fechar o cadastro:** usar `PAPERCLIP_AUTH_DISABLE_SIGN_UP=true` agora que o admin existe. Hoje só o Access impede novas contas.

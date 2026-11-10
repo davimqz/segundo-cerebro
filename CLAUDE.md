@@ -32,7 +32,7 @@ automação com IA para PMEs, com sede em Curitiba, e Davi a opera sozinho.
 4. **Custo.** O teto é de R$ 100 por mês no total. Use modelos de IA gratuitos (OpenRouter) e planos gratuitos. Qualquer custo novo precisa da minha aprovação.
 5. **Licenças.** Use só componentes cuja licença permita implantar no servidor de um cliente.
 6. **Auditoria.**
-   - Toda ação de agente é registrada na tabela `atividades`, que é append-only.
+   - Toda ação de agente que grava ou muda algo é registrada na tabela `atividades`, que é append-only. Consultas (só leitura) não entram.
    - Agentes nunca acessam o banco direto: usam a API `/api/v1` ou o MCP do painel.
 
 ## Infraestrutura (Etapa 0, concluída)
@@ -149,5 +149,5 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 7 (ponte do Hermes com o painel, servidor MCP): escrever a spec 007 com `/asttra:feature`. O item 6 (Hermes no Telegram e aprovações) foi concluído em 2026-11-08.
+1. Etapa 1, item 7 (ponte do Hermes com o painel): implementar a spec 007, aprovada em 2026-11-10, numa sessão limpa. O item 6 (Hermes no Telegram e aprovações) foi concluído em 2026-11-08.
 2. Pendente do item 6b: conferir, de outra conta do Telegram, que o bot de aprovações ignora a mensagem (passo 87.6 do playbook).
