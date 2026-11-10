@@ -138,6 +138,14 @@ class TesteMcpPaperclip(unittest.TestCase):
         self.assertEqual(PainelFalso.registradas, [{"id": "AST-1", "titulo": "Nota", "departamento": "Administração",
                                                     "link": "https://agentes.exemplo.com.br/issues/AST-1"}])
 
+    def test_titulo_longo_e_cortado_no_registro(self):
+        texto, erro = self.chamar("criar_tarefa", {"departamento": "Crescimento", "titulo": "a" * 400,
+                                                   "descricao": "Y"}, painel=self.painel)
+        self.assertFalse(erro, texto)
+        self.assertEqual(json.loads(texto)["painel"], servidor.PAINEL_REGISTRADA)
+        self.assertEqual(len(PaperclipFalso.criadas[0]["title"]), 400)
+        self.assertEqual(len(PainelFalso.registradas[0]["titulo"]), 300)
+
     def test_painel_fora_do_ar_nao_desfaz_a_tarefa(self):
         texto, erro = self.criar(servidor.RegistroPainel("http://127.0.0.1:1", CHAVE_PAINEL))
         self.assertFalse(erro, texto)

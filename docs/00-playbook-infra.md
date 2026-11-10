@@ -909,7 +909,7 @@ sudo cp /opt/asttra/painel-src/infra/hermes/{config.yaml,SOUL.md,compose.yml,con
 sudo cp -r /opt/asttra/painel-src/infra/hermes/mcp-paperclip /opt/asttra/painel-src/infra/hermes/mcp-painel /opt/asttra/hermes/
 ```
 
-90. **Criar a chave do Hermes no painel** (no servidor). O script cria a chave do agente `hermes`, grava `PAINEL_API_KEY` (e `PAINEL_API_URL`, se faltar) no `.env` do Hermes sem mostrá-la e revoga as chaves antigas do Hermes. A segunda linha deve mostrar `1`. Rodar de novo troca a chave.
+90. **Criar a chave do Hermes no painel** (no servidor). O script cria a chave do agente `hermes`, grava `PAINEL_API_KEY` (e `PAINEL_API_URL`, se faltar) no `.env` do Hermes sem mostrá-la e revoga as chaves antigas do Hermes. A segunda linha deve mostrar `1`. Rodar de novo troca a chave. Se o script parar com erro depois de criar a chave, ela fica ativa sem uso; é só rodar de novo, que ela é revogada.
 
 ```bash
 sudo /opt/asttra/painel/criar-chave-hermes.sh

@@ -344,11 +344,14 @@ total="$(sessao GET "/companies/$EMPRESA_ID/issues" | jq '[.[] | select(.title =
 echo "   ok ($IDENT em Crescimento)"
 
 echo "== MCP do painel sem configuração"
-saida_painel="$(printf '%s
-'   "$(jq -nc '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-06-18"}}')"   "$(jq -nc '{jsonrpc:"2.0",id:2,method:"tools/list"}')"   "$(jq -nc '{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"avisos_abertos",arguments:{}}}')" |
-  dc exec -T hermes sh -c 'python3 /opt/asttra/mcp-painel/servidor.py')"
-jq -e 'select(.id == 2) | [.result.tools[].name] == ["departamentos", "ultimas_atividades", "avisos_abertos"]'   <<<"$saida_painel" >/dev/null || falhar "o MCP do painel deveria ter só as 3 ferramentas de leitura: $saida_painel"
-jq -e 'select(.id == 3) | .result.isError and (.result.content[0].text | contains("não está configurado"))'   <<<"$saida_painel" >/dev/null || falhar "o MCP do painel sem chave deveria dizer que não está configurado"
+pedidos_painel="$(jq -nc '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-06-18"}}')
+$(jq -nc '{jsonrpc:"2.0",id:2,method:"tools/list"}')
+$(jq -nc '{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"avisos_abertos",arguments:{}}}')"
+saida_painel="$(printf '%s\n' "$pedidos_painel" | dc exec -T hermes sh -c 'python3 /opt/asttra/mcp-painel/servidor.py')"
+jq -e 'select(.id == 2) | [.result.tools[].name] == ["departamentos", "ultimas_atividades", "avisos_abertos"]' \
+  <<<"$saida_painel" >/dev/null || falhar "o MCP do painel deveria ter só as 3 ferramentas de leitura: $saida_painel"
+jq -e 'select(.id == 3) | .result.isError and (.result.content[0].text | contains("não está configurado"))' \
+  <<<"$saida_painel" >/dev/null || falhar "o MCP do painel sem chave deveria dizer que não está configurado"
 echo "   ok"
 
 echo "== Nenhum segredo na pasta de dados (ela vai para o backup)"

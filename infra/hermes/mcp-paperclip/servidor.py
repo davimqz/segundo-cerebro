@@ -38,6 +38,7 @@ VERSAO = "1.0.0"
 PROTOCOLO_PADRAO = "2025-06-18"
 TEMPO_LIMITE = 20
 TEMPO_LIMITE_PAINEL = 10
+TITULO_MAXIMO_PAINEL = 300
 # Textos do campo "painel" na resposta de criar_tarefa (o SOUL.md orienta o Hermes por eles).
 PAINEL_REGISTRADA = "registrada em Atividades"
 PAINEL_NAO_CONFIGURADO = "registro no painel não configurado (falta PAINEL_API_URL ou PAINEL_API_KEY)"
@@ -202,6 +203,8 @@ class RegistroPainel:
         if urllib.parse.urlsplit(self.url).scheme not in ("http", "https"):
             return "não consegui registrar no painel: PAINEL_API_URL precisa começar com http:// ou https://"
         corpo = {k: tarefa.get(k) for k in ("id", "titulo", "departamento", "link")}
+        # O painel aceita até 300 caracteres no título; o Paperclip não tem esse limite.
+        corpo["titulo"] = str(corpo.get("titulo") or "")[:TITULO_MAXIMO_PAINEL]
         pedido = urllib.request.Request(
             f"{self.url}/api/v1/tarefas",
             data=json.dumps(corpo).encode(),
