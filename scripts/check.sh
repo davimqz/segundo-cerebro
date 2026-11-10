@@ -27,10 +27,11 @@ else
 fi
 echo "   ok (${#scripts[@]} scripts)"
 
-echo "== MCP do Paperclip para o Hermes: testes de unidade"
+echo "== MCPs do Hermes (Paperclip e painel): testes de unidade"
 PYTHON="$(command -v python3 || command -v python || true)"
 [[ -n "$PYTHON" ]] || { echo "python3 não encontrado." >&2; exit 1; }
 PYTHONIOENCODING=utf-8 "$PYTHON" -m unittest discover -s infra/hermes/mcp-paperclip -q
+PYTHONIOENCODING=utf-8 "$PYTHON" -m unittest discover -s infra/hermes/mcp-painel -q
 echo "   ok"
 
 echo "== Painel: tipos, lint, formatação e testes de unidade"

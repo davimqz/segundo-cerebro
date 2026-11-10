@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Teste de ponta a ponta do painel: sobe um PostgreSQL descartável e o painel com o próprio
 # infra/painel/compose.yml, confere a implantação (healthy, porta só no 127.0.0.1, cabeçalhos),
-# cria o usuário com `pnpm usuario criar` dentro do container e roda o Playwright.
+# testa o criar-chave-hermes.sh e as rotas /api/v1 (spec 007), cria o usuário com `pnpm usuario criar`
+# dentro do container e roda o Playwright.
 # A tela Aprovações fala com um Paperclip falso (painel/e2e/paperclip-falso.mjs), num container na
 # rede asttra; o bot de aprovações sobe sem Telegram e fica parado.
 #
@@ -110,6 +111,46 @@ for _ in $(seq 1 20); do
 done
 dc logs bot-aprovacoes 2>&1 | grep -q "não configurado" || falhar "sem Telegram, o bot deveria avisar no log e ficar parado"
 if dc logs bot-aprovacoes 2>&1 | grep -q "$CHAVE_FALSA"; then falhar "a chave apareceu no log do bot"; fi
+echo "   ok"
+
+echo "== Chave do Hermes e rotas /api/v1 (spec 007)"
+mkdir "$TMP/hermes"
+printf 'HERMES_DONO=Teste\nPAINEL_API_KEY=pnl_antiga\n' >"$TMP/hermes/.env"
+chmod 600 "$TMP/hermes/.env"
+status_api() { curl -s -o /dev/null -w '%{http_code}' "${@:2}" "http://127.0.0.1:$PORTA/api/v1/$1"; }
+chave_do_env() { sed -n 's/^PAINEL_API_KEY=//p' "$TMP/hermes/.env"; }
+HERMES_ENV="$TMP/hermes/.env" bash "$TMP/painel/criar-chave-hermes.sh" >"$TMP/chave-1.log" 2>&1 ||
+  { cat "$TMP/chave-1.log" >&2; falhar "criar-chave-hermes.sh (vez 1)"; }
+CHAVE_1="$(chave_do_env)"
+[[ "$CHAVE_1" =~ ^pnl_[A-Za-z0-9_-]{43}$ ]] || falhar "a chave gravada no .env do Hermes tem formato inesperado"
+[[ "$(grep -c '^PAINEL_API_KEY=' "$TMP/hermes/.env")" == "1" ]] || falhar "o .env deveria ter uma só PAINEL_API_KEY"
+grep -qx 'PAINEL_API_URL=http://painel:3000' "$TMP/hermes/.env" || falhar "faltou PAINEL_API_URL no .env do Hermes"
+grep -qx 'HERMES_DONO=Teste' "$TMP/hermes/.env" || falhar "o script apagou outras linhas do .env do Hermes"
+if [[ "$(uname -s)" == Linux ]]; then
+  [[ "$(stat -c %a "$TMP/hermes/.env")" == "600" ]] || falhar "o .env do Hermes deveria continuar com permissão 600"
+fi
+[[ "$(status_api avisos)" == "401" ]] || falhar "/api/v1/avisos sem chave deveria responder 401"
+[[ "$(status_api avisos -H "authorization: Bearer $CHAVE_1")" == "200" ]] || falhar "/api/v1/avisos com a chave deveria responder 200"
+corpo='{"id":"AST-E2E","titulo":"Tarefa do E2E","departamento":"crescimento"}'
+[[ "$(status_api tarefas -H "authorization: Bearer $CHAVE_1" -H 'content-type: application/json' -d "$corpo")" == "201" ]] ||
+  falhar "POST /api/v1/tarefas deveria responder 201"
+[[ "$(status_api tarefas -H "authorization: Bearer $CHAVE_1" -H 'content-type: application/json' -d "$corpo")" == "200" ]] ||
+  falhar "POST /api/v1/tarefas repetido deveria responder 200"
+# Rodar de novo troca a chave: a antiga deixa de valer.
+HERMES_ENV="$TMP/hermes/.env" bash "$TMP/painel/criar-chave-hermes.sh" >"$TMP/chave-2.log" 2>&1 ||
+  { cat "$TMP/chave-2.log" >&2; falhar "criar-chave-hermes.sh (vez 2)"; }
+CHAVE_2="$(chave_do_env)"
+[[ -n "$CHAVE_2" && "$CHAVE_2" != "$CHAVE_1" ]] || falhar "a 2ª vez deveria gravar uma chave nova"
+[[ "$(status_api avisos -H "authorization: Bearer $CHAVE_1")" == "401" ]] || falhar "a chave antiga deveria estar revogada"
+[[ "$(status_api avisos -H "authorization: Bearer $CHAVE_2")" == "200" ]] || falhar "a chave nova deveria valer"
+grep -q 'revogadas de hermes' "$TMP/chave-2.log" || { cat "$TMP/chave-2.log" >&2; falhar "a 2ª vez deveria revogar a chave antiga"; }
+for segredo in "$CHAVE_1" "$CHAVE_2"; do
+  if grep -qF "$segredo" "$TMP"/chave-*.log || dc logs painel 2>&1 | grep -qF "$segredo"; then
+    falhar "uma chave do Hermes apareceu na tela ou no log do painel"
+  fi
+done
+listagem="$(dc exec -T painel node servidor/dist-scripts/chave.mjs listar)"
+[[ "$(grep -c $'\thermes\t' <<<"$listagem")" == "2" ]] || falhar "listar deveria mostrar as 2 chaves do hermes: $listagem"
 echo "   ok"
 
 echo "== pnpm usuario criar (dentro do container)"

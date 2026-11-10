@@ -784,7 +784,7 @@ A troca é manual. Antes, leia as notas da versão nova: o Hermes pode ligar fer
 ```bash
 cd /opt/asttra/painel-src && git pull
 sudo cp /opt/asttra/painel-src/infra/hermes/{config.yaml,SOUL.md,compose.yml,configurar.sh} /opt/asttra/hermes/
-sudo cp -r /opt/asttra/painel-src/infra/hermes/mcp-paperclip /opt/asttra/hermes/
+sudo cp -r /opt/asttra/painel-src/infra/hermes/mcp-paperclip /opt/asttra/painel-src/infra/hermes/mcp-painel /opt/asttra/hermes/
 cd /opt/asttra/hermes
 sudo sed -i "s#^HERMES_IMAGEM=.*#$(grep '^HERMES_IMAGEM=' /opt/asttra/painel-src/infra/hermes/.env.example)#" .env
 sudo /opt/asttra/hermes/configurar.sh
@@ -879,6 +879,83 @@ sudo TITULO="Teste 006 – painel" /opt/asttra/paperclip/teste-aprovacao.sh
 - **Chave de board:** rode de novo `sudo /opt/asttra/painel/criar-chave-paperclip.sh`. Ele cria uma chave nova e revoga a anterior. Depois, `cd /opt/asttra/painel && sudo docker compose up -d`.
 - **Token do bot:** no `@BotFather`, use `/revoke` para gerar outro. Repita o passo 84 e rode `sudo docker compose up -d` em `/opt/asttra/painel`.
 
+## Ponte do Hermes
+
+O Hermes passa a consultar o painel (departamentos, últimas atividades e avisos abertos) e a registrar em Atividades cada tarefa que cria no Paperclip. Ele usa as rotas `/api/v1` do painel pela rede interna (`http://painel:3000`), com uma **chave de agente do painel** (`pnl_...`). O banco guarda só o hash dessa chave, e ela fica no `.env` do Hermes. Spec: [`specs/007-ponte-hermes-painel.md`](specs/007-ponte-hermes-painel.md). Decisão: [ADR 0009](adr/0009-chaves-de-agente-do-painel.md).
+
+No servidor:
+- O painel ganha a tabela `chaves_agentes`, criada pela migração na subida do container, e o script `/opt/asttra/painel/criar-chave-hermes.sh`.
+- O Hermes ganha o MCP `painel` (pasta `/opt/asttra/hermes/mcp-painel`) e as linhas `PAINEL_API_URL` e `PAINEL_API_KEY` no `.env`.
+
+**Antes de começar:** o PR da spec 007 precisa estar na `main`, e o painel, o Paperclip e o Hermes precisam estar no ar.
+
+### Instalação
+
+88. **Atualizar o painel** (no servidor). A migração da tabela `chaves_agentes` roda sozinha na subida. O build leva alguns minutos. O `painel` deve aparecer como `healthy`, e a última linha deve mostrar `401` (sem chave, a rota recusa).
+
+```bash
+cd /opt/asttra/painel-src && git pull
+sudo cp /opt/asttra/painel-src/infra/painel/criar-chave-hermes.sh /opt/asttra/painel/
+sudo chmod 755 /opt/asttra/painel/criar-chave-hermes.sh
+cd /opt/asttra/painel && sudo docker compose up -d --build --wait
+sudo docker compose ps
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18000/api/v1/avisos
+```
+
+89. **Copiar os arquivos novos do Hermes** (no servidor). O `.env` do Hermes não é tocado.
+
+```bash
+sudo cp /opt/asttra/painel-src/infra/hermes/{config.yaml,SOUL.md,compose.yml,configurar.sh} /opt/asttra/hermes/
+sudo cp -r /opt/asttra/painel-src/infra/hermes/mcp-paperclip /opt/asttra/painel-src/infra/hermes/mcp-painel /opt/asttra/hermes/
+```
+
+90. **Criar a chave do Hermes no painel** (no servidor). O script cria a chave do agente `hermes`, grava `PAINEL_API_KEY` (e `PAINEL_API_URL`, se faltar) no `.env` do Hermes sem mostrá-la e revoga as chaves antigas do Hermes. A segunda linha deve mostrar `1`. Rodar de novo troca a chave.
+
+```bash
+sudo /opt/asttra/painel/criar-chave-hermes.sh
+sudo grep -c '^PAINEL_API_KEY=pnl_' /opt/asttra/hermes/.env
+```
+
+91. **Recopiar a configuração do Hermes** (no servidor, depois no navegador). O `configurar.sh` copia o `config.yaml` e o `SOUL.md` novos para `dados/`. Ele mostra um link de acesso: aprove-o como no passo 64. A chave de agente do Paperclip continua a mesma.
+
+```bash
+sudo /opt/asttra/hermes/configurar.sh
+```
+
+92. **Recriar o Hermes e conferir** (no servidor). Confira estes resultados:
+    - nas duas listas (Telegram e `api_server`), as linhas `paperclip` e `painel` aparecem com "all tools enabled";
+    - `terminal`, `file`, `code_execution`, `browser` e `web` não aparecem como `✓ enabled`;
+    - a última linha mostra `0`: nenhuma chave do painel apareceu nos logs.
+
+```bash
+cd /opt/asttra/hermes && sudo docker compose up -d --force-recreate --wait
+sudo docker compose exec -T -u hermes hermes hermes tools list --platform telegram
+sudo docker compose exec -T -u hermes hermes hermes tools list --platform api_server
+sudo docker compose logs hermes | grep -c pnl_
+```
+
+93. **Teste de ponta a ponta (o "Pronto quando")** (celular e navegador). Siga a "Verificação de ponta a ponta" da spec 007:
+    1. Em Atividades, no painel, confira a linha `chave_criada` do passo 90.
+    2. No Telegram, pergunte ao Hermes "tem algum aviso aberto no painel?". Ele deve responder com a lista (ou "nenhum") **sem pedir confirmação**.
+    3. Peça uma tarefa de teste (por exemplo, "cria uma tarefa em Administração: teste da ponte do painel"), confira o que ele entendeu e responda "sim". A tarefa deve aparecer no Paperclip, e em Atividades deve aparecer `tarefa_criada`, autor `hermes`, departamento Administração e alvo `paperclip:AST-N`.
+    4. Pergunte "o que aconteceu hoje no painel?". A resposta deve citar a tarefa do passo anterior.
+    5. No servidor, rode o comando abaixo: deve mostrar `0`.
+
+```bash
+cd /opt/asttra/painel && sudo docker compose logs painel | grep -c pnl_
+cd /opt/asttra/hermes && sudo docker compose logs hermes | grep -c pnl_
+```
+
+### Trocar a chave do Hermes no painel
+
+Rode de novo `sudo /opt/asttra/painel/criar-chave-hermes.sh` e recrie o Hermes (`cd /opt/asttra/hermes && sudo docker compose up -d --force-recreate --wait`). Para ver as chaves (sem o hash) ou revogar uma à mão:
+
+```bash
+cd /opt/asttra/painel
+sudo docker compose exec painel pnpm chave listar
+sudo docker compose exec painel pnpm chave revogar <id>
+```
+
 ## Credenciais
 
 Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome e o IP do servidor anotado em cada item. Nenhum valor é registrado neste documento.
@@ -899,6 +976,7 @@ Todas as credenciais ficam no gerenciador de senhas, com o mesmo padrão de nome
 - A `API_SERVER_KEY` do Hermes e a chave de agente do Paperclip ficam só em `/opt/asttra/hermes/.env` (geradas no servidor). A `API_SERVER_KEY` também fica guardada como segredo do Paperclip (`hermes-api-key`).
 - **Telegram – bot de aprovações**: o token do segundo bot (passo 80).
 - A chave de board `painel-aprovacoes` do Paperclip fica só em `/opt/asttra/painel/.env` (passo 85). Não vai para o gerenciador: se perder, rode o script de novo.
+- A chave de agente do Hermes no painel (`pnl_...`) fica só em `/opt/asttra/hermes/.env` (passo 90); o banco do painel guarda só o hash. Não vai para o gerenciador: se perder, rode o script de novo.
 
 Se a chave for perdida, o acesso é recuperado pelo terminal do painel do provedor, instalando uma nova chave pública.
 
@@ -962,4 +1040,5 @@ Se a chave for perdida, o acesso é recuperado pelo terminal do painel do proved
 - [x] Paperclip no ar em `agentes.asttralabs.com.br` (Etapa 1, item 5: passos 54 a 67 executados em 03/11/2026)
 - [x] Hermes no Telegram (Etapa 1, item 6a: passos 68 a 79 executados em 08/11/2026)
 - [x] Aprovações no painel e no Telegram (Etapa 1, item 6b: passos 80 a 87 executados em 08/11/2026; falta o teste com outra conta do Telegram, passo 87.6)
+- [ ] Ponte do Hermes com o painel (Etapa 1, item 7: passos 88 a 93)
 - [x] Rotina de backup (Etapa 1, item 2: passos 27 a 42 executados em 02/11/2026; primeiro backup automático das 03:00 confirmado em 03/11/2026)

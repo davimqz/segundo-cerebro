@@ -52,6 +52,10 @@ Ações gravadas em `atividades` pelo núcleo: `login`, `logout`, `senha_trocada
 
 Quando o Paperclip ou o Telegram caem, o painel e o bot abrem um único aviso por serviço (origens `aprovacoes:paperclip` e `aprovacoes:telegram`) e o resolvem sozinhos quando a conexão volta.
 
+**Chaves de agente (spec 007, [ADR 0009](adr/0009-chaves-de-agente-do-painel.md)).** A tabela `chaves_agentes` dá acesso às rotas `/api/v1`: id, agente (ex.: `hermes`), hash (SHA-256 da chave, único), escopos (lista de texto), criada_em e revogada_em (vazio = ativa). Um `check` aceita só os escopos `departamentos:ler`, `atividades:ler`, `avisos:ler` e `tarefas:registrar`. A chave tem o prefixo `pnl_` e 32 bytes aleatórios, e aparece uma única vez, na saída do comando `pnpm chave criar`. Ações gravadas em `atividades`:
+- `chave_criada` e `chave_revogada`: autor `sistema`/`script:chave`, `alvo` = `chave:<id>`, com o agente e os escopos em `detalhes`;
+- `tarefa_criada`: autor `agente`/`<agente da chave>`, `alvo` = `paperclip:<id da tarefa>` (ex.: `paperclip:AST-12`), o departamento encontrado pelo nome (vazio se não existir) e o título e o link em `detalhes`. O mesmo `alvo` não é gravado duas vezes.
+
 Regras:
 
 - `atividades` só recebe inclusões: nada é editado nem apagado, para servir de trilha de auditoria. Um gatilho no PostgreSQL recusa `UPDATE`, `DELETE` e `TRUNCATE`.
@@ -62,10 +66,19 @@ Regras:
 
 Agentes nunca acessam o banco diretamente: usam a API do painel, que aplica as permissões e registra cada ação em `atividades`.
 
-- **Rotas internas** em `/api/v1/...`, acessíveis só pela rede Docker interna; de fora, passam pelo login da Cloudflare.
-- **Chave por agente:** o Hermes e o n8n recebem chaves próprias, cada uma com o que pode fazer (ler, criar rascunho). Ações que saem da empresa passam pelo Paperclip para aprovação.
-- **Servidor MCP do painel** (no MVP): expõe as mesmas rotas como ferramentas, para o Hermes e o Claude Code usarem sem código extra.
-- **Rotas do núcleo no MVP:** consultar departamentos, registrar atividade, criar e resolver aviso, consultar tema ativo. Cada vertical acrescenta as suas.
+- **Rotas internas** em `/api/v1/...`, acessíveis pela rede Docker interna (`http://painel:3000`); de fora, passam pelo login da Cloudflare e também exigem a chave.
+- **Chave por agente:** cada agente tem a própria chave, com os escopos do que pode fazer (tabela `chaves_agentes`). Ações que saem da empresa passam pelo Paperclip para aprovação. As chaves são geridas só pelo comando `pnpm chave criar|listar|revogar`, dentro do container do painel.
+- **Respostas de erro:** 401 `{ "erro": "nao_autorizado" }` sem chave, com chave desconhecida ou revogada (sem dizer o motivo); 403 `{ "erro": "sem_permissao" }` sem o escopo; 400 com corpo inválido; 503 sem detalhes quando o banco cai. As rotas nunca escrevem a chave nos logs e respondem com `Cache-Control: no-store`.
+- **MCP do painel para o Hermes** (spec 007): um servidor pequeno em Python no container do Hermes (`infra/hermes/mcp-painel/`), com as ferramentas `departamentos`, `ultimas_atividades` e `avisos_abertos`, que chamam as rotas abaixo. O MCP rodando dentro do painel e o acesso do Claude Code ficam para depois.
+
+| Rota | Escopo | O que faz |
+| --- | --- | --- |
+| `GET /api/v1/departamentos` | `departamentos:ler` | `[{ slug, nome, areas }]` na ordem do menu |
+| `GET /api/v1/atividades?limite=N` | `atividades:ler` | As N atividades mais novas (padrão 20, máximo 50), com `quando`, `autor` (nome do usuário ou id do agente), `acao`, `alvo` e `departamento`. Sem `detalhes` |
+| `GET /api/v1/avisos` | `avisos:ler` | Os avisos abertos, com `tipo`, `mensagem`, `origem` e `criado_em` |
+| `POST /api/v1/tarefas` | `tarefas:registrar` | Corpo `{ id, titulo, departamento, link }`: grava `tarefa_criada` (201) ou responde 200 se o mesmo `id` já estava registrado. O autor vem sempre da chave |
+
+Só as ações que gravam algo vão para `atividades`; as consultas (GET) não. As rotas de criar e resolver aviso e de consultar o tema ativo ficam para quando algum agente precisar. Cada vertical acrescenta as suas.
 
 ## Verticais futuras e perguntas em aberto
 

@@ -88,6 +88,33 @@ export async function listar(
   return { linhas: linhas.slice(0, POR_PAGINA), temMais: linhas.length > POR_PAGINA };
 }
 
+export type AtividadeParaAgente = {
+  quando: Date;
+  autor: string;
+  acao: string;
+  alvo: string | null;
+  departamento: string | null;
+};
+
+/**
+ * As atividades mais novas, para os agentes (GET /api/v1/atividades). Sem `detalhes`, para não mandar
+ * ao modelo motivos de recusa nem dados de clientes. O autor é o nome do usuário ou o id do agente.
+ */
+export async function ultimasAtividades(limite: number): Promise<AtividadeParaAgente[]> {
+  return banco()
+    .select({
+      quando: atividades.quando,
+      autor: sql<string>`coalesce((select u.nome from usuarios u where u.id = ${atividades.autorId} and ${atividades.autorTipo} = 'usuario'), ${atividades.autorId})`,
+      acao: atividades.acao,
+      alvo: atividades.alvo,
+      departamento: departamentos.nome,
+    })
+    .from(atividades)
+    .leftJoin(departamentos, eq(departamentos.id, atividades.departamentoId))
+    .orderBy(desc(atividades.quando), desc(atividades.id))
+    .limit(limite);
+}
+
 /** Valores distintos para os filtros da tela Atividades. */
 export async function opcoesDeFiltro(): Promise<{
   autores: { id: string; nome: string }[];

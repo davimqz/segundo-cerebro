@@ -25,11 +25,11 @@ auxiliary:
 provider_routing:
   data_collection: allow
 
-# Ferramentas, camada 1: a lista permitida em cada plataforma. "paperclip" é o MCP abaixo.
+# Ferramentas, camada 1: a lista permitida em cada plataforma. "paperclip" e "painel" são os MCPs abaixo.
 # api_server é a porta que o Paperclip chama (hermes_gateway); o preset dela vem com terminal.
 platform_toolsets:
-  telegram: [memory, session_search, skills, todo, clarify, paperclip]
-  api_server: [memory, session_search, skills, todo, paperclip]
+  telegram: [memory, session_search, skills, todo, clarify, paperclip, painel]
+  api_server: [memory, session_search, skills, todo, paperclip, painel]
 
 agent:
   # Ferramentas, camada 2: proibidas em qualquer plataforma, mesmo se um preset as ligar.
@@ -52,7 +52,8 @@ agent:
 approvals:
   mode: manual
 
-# MCP próprio do Paperclip (infra/hermes/mcp-paperclip, montado só para leitura).
+# MCPs próprios (montados só para leitura): o do Paperclip (spec 005) e o do painel (spec 007).
+# O do Paperclip também recebe a chave do painel, para registrar em Atividades as tarefas que cria.
 mcp_servers:
   paperclip:
     command: python3
@@ -61,6 +62,18 @@ mcp_servers:
       PAPERCLIP_API_URL: "${PAPERCLIP_API_URL}"
       PAPERCLIP_API_KEY: "${PAPERCLIP_API_KEY}"
       PAPERCLIP_URL_PUBLICA: "${PAPERCLIP_URL_PUBLICA}"
+      PAINEL_API_URL: "${PAINEL_API_URL}"
+      PAINEL_API_KEY: "${PAINEL_API_KEY}"
+    timeout: 30
+    tools:
+      prompts: false
+      resources: false
+  painel:
+    command: python3
+    args: ["/opt/asttra/mcp-painel/servidor.py"]
+    env:
+      PAINEL_API_URL: "${PAINEL_API_URL}"
+      PAINEL_API_KEY: "${PAINEL_API_KEY}"
     timeout: 30
     tools:
       prompts: false

@@ -6,8 +6,10 @@
 #   - a API do Hermes na rede "asttra": /health público e 401 sem a chave;
 #   - configurar.sh duas vezes: contratação aprovada, 1 agente hermes_gateway, sem heartbeat,
 #     1 chave de agente gravada no .env (sem aparecer no log);
-#   - ferramentas ativas no Telegram e na API sem terminal, código, arquivos, navegador nem web;
-#   - o MCP do Paperclip, de dentro do container, cria a tarefa no projeto certo;
+#   - ferramentas ativas no Telegram e na API sem terminal, código, arquivos, navegador nem web,
+#     com os MCPs paperclip e painel ligados (spec 007);
+#   - o MCP do Paperclip, de dentro do container, cria a tarefa no projeto certo (e, sem o painel
+#     configurado, avisa que não registrou nele); o MCP do painel responde que não está configurado;
 #   - a memória (pasta de dados) continua depois de recriar o container.
 #
 # Precisa de: docker (com compose), curl, jq, openssl e as portas 127.0.0.1:5432 e :18100 livres.
@@ -179,6 +181,8 @@ API_SERVER_KEY=$API_KEY_HERMES
 PAPERCLIP_API_URL=http://paperclip:3100
 PAPERCLIP_URL_PUBLICA=$URL
 PAPERCLIP_API_KEY=
+PAINEL_API_URL=
+PAINEL_API_KEY=
 EOF
 configurar_hermes() {
   rodar_aprovando "$1" env CONFIG_ENV="$TMP/paperclip/configuracao.env" PAPERCLIP_DIR="$TMP/paperclip" \
@@ -305,7 +309,9 @@ for plataforma in telegram api_server; do
     fi
   done
   grep -Eq "✓ enabled +memory( |$)" <<<"$lista" || { echo "$lista" >&2; falhar "memory deveria estar ligada em $plataforma"; }
-  grep -Eq "^ +paperclip +all tools enabled" <<<"$lista" || { echo "$lista" >&2; falhar "o MCP paperclip deveria estar ligado em $plataforma"; }
+  for mcp in paperclip painel; do
+    grep -Eq "^ +$mcp +all tools enabled" <<<"$lista" || { echo "$lista" >&2; falhar "o MCP $mcp deveria estar ligado em $plataforma"; }
+  done
 done
 echo "   ok"
 
@@ -326,6 +332,8 @@ resposta 3 | jq -e '.isError == false' >/dev/null || falhar "criar_tarefa: $(res
 tarefa="$(resposta 3 | jq -r '.content[0].text')"
 IDENT="$(jq -r .id <<<"$tarefa")"
 [[ "$(jq -r .link <<<"$tarefa")" == "$URL/issues/$IDENT" ]] || falhar "link errado: $tarefa"
+resposta 3 | jq -e '.content[0].text | fromjson | .painel | contains("não configurado")' >/dev/null ||
+  falhar "sem PAINEL_API_URL/KEY, criar_tarefa deveria avisar que o registro no painel não está configurado"
 resposta 4 | jq -e '.isError == true' >/dev/null || falhar "criar_tarefa com departamento inválido deveria falhar"
 criada="$(sessao GET "/issues/$IDENT")"
 PROJETO_CRESCIMENTO="$(sessao GET "/companies/$EMPRESA_ID/projects" | jq -r '.[] | select(.name == "Crescimento") | .id')"
@@ -334,6 +342,14 @@ jq -e --arg p "$PROJETO_CRESCIMENTO" '.projectId == $p and .title == "Tarefa do 
 total="$(sessao GET "/companies/$EMPRESA_ID/issues" | jq '[.[] | select(.title == "Não deve existir")] | length')"
 [[ "$total" == "0" ]] || falhar "a tarefa com departamento inválido foi criada"
 echo "   ok ($IDENT em Crescimento)"
+
+echo "== MCP do painel sem configuração"
+saida_painel="$(printf '%s
+'   "$(jq -nc '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-06-18"}}')"   "$(jq -nc '{jsonrpc:"2.0",id:2,method:"tools/list"}')"   "$(jq -nc '{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"avisos_abertos",arguments:{}}}')" |
+  dc exec -T hermes sh -c 'python3 /opt/asttra/mcp-painel/servidor.py')"
+jq -e 'select(.id == 2) | [.result.tools[].name] == ["departamentos", "ultimas_atividades", "avisos_abertos"]'   <<<"$saida_painel" >/dev/null || falhar "o MCP do painel deveria ter só as 3 ferramentas de leitura: $saida_painel"
+jq -e 'select(.id == 3) | .result.isError and (.result.content[0].text | contains("não está configurado"))'   <<<"$saida_painel" >/dev/null || falhar "o MCP do painel sem chave deveria dizer que não está configurado"
+echo "   ok"
 
 echo "== Nenhum segredo na pasta de dados (ela vai para o backup)"
 for segredo in "$API_KEY_HERMES" "$CHAVE_AGENTE" "sk-or-chave-de-teste"; do
