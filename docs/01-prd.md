@@ -90,7 +90,7 @@ O MVP entrega a visão geral e um assistente no Telegram com aprovações; canai
 | --- | --- | --- |
 | RF01 | Mostrar numa tela só o estado de cada área: tarefas abertas, aprovações pendentes, leads e conteúdos recentes | Painel |
 | RF02 | Listar aprovações pendentes e permitir aprovar ou recusar no painel e no Telegram | Paperclip + Telegram |
-| RF03 | Registrar toda ação de agente com data, autor, o que foi feito e quem aprovou | Paperclip |
+| RF03 | Registrar toda ação de agente que grava ou muda algo (consultas não) com data, autor, o que foi feito e quem aprovou | Paperclip |
 | RF04 | Responder perguntas sobre processos, clientes e documentos com base na base de conhecimento, citando a fonte | Hermes |
 | RF05 | Criar tarefas a partir de mensagens no Telegram e atribuí-las a um agente ou a Davi | Hermes + Paperclip |
 | RF06 | Ler o Gmail, resumir o que importa e preparar rascunhos; enviar só após aprovação | n8n + Hermes |
