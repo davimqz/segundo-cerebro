@@ -71,24 +71,117 @@ class PaperclipFalso(BaseHTTPRequestHandler):
             self._responder(404, {"error": "not found"})
 
 
+CHAVE_PAINEL = "pnl_chave-de-teste"
+
+
+class PainelFalso(BaseHTTPRequestHandler):
+    """Painel falso: só POST /api/v1/tarefas (spec 007)."""
+
+    registradas: list[dict] = []
+    status_forcado: int | None = None
+
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        tamanho = int(self.headers.get("content-length", 0))
+        corpo = json.loads(self.rfile.read(tamanho))
+        if PainelFalso.status_forcado:
+            status = PainelFalso.status_forcado
+        elif self.headers.get("authorization") != f"Bearer {CHAVE_PAINEL}":
+            status = 401
+        elif self.path == "/api/v1/tarefas":
+            PainelFalso.registradas.append(corpo)
+            status = 201
+        else:
+            status = 404
+        self.send_response(status)
+        self.send_header("content-length", "2")
+        self.end_headers()
+        self.wfile.write(b"{}")
+
+
 class TesteMcpPaperclip(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.http = ThreadingHTTPServer(("127.0.0.1", 0), PaperclipFalso)
         cls.url = f"http://127.0.0.1:{cls.http.server_address[1]}"
         threading.Thread(target=cls.http.serve_forever, daemon=True).start()
+        cls.http_painel = ThreadingHTTPServer(("127.0.0.1", 0), PainelFalso)
+        cls.url_painel = f"http://127.0.0.1:{cls.http_painel.server_address[1]}"
+        threading.Thread(target=cls.http_painel.serve_forever, daemon=True).start()
 
     @classmethod
     def tearDownClass(cls):
-        cls.http.shutdown()
-        cls.http.server_close()
+        for http in (cls.http, cls.http_painel):
+            http.shutdown()
+            http.server_close()
 
     def setUp(self):
         PaperclipFalso.criadas = []
+        PainelFalso.registradas = []
+        PainelFalso.status_forcado = None
         self.pc = servidor.Paperclip(self.url, CHAVE, "https://agentes.exemplo.com.br/")
+        self.painel = servidor.RegistroPainel(self.url_painel + "/", CHAVE_PAINEL)
 
-    def chamar(self, nome, argumentos=None, pc=None):
-        return servidor.chamar_ferramenta(pc or self.pc, nome, argumentos or {})
+    def chamar(self, nome, argumentos=None, pc=None, painel=None):
+        return servidor.chamar_ferramenta(pc or self.pc, nome, argumentos or {}, painel)
+
+    def criar(self, painel):
+        return self.chamar("criar_tarefa", {"departamento": "administracao", "titulo": "Nota",
+                                            "descricao": "Emitir nota"}, painel=painel)
+
+    def test_registra_no_painel_depois_de_criar(self):
+        texto, erro = self.criar(self.painel)
+        self.assertFalse(erro, texto)
+        self.assertEqual(json.loads(texto)["painel"], servidor.PAINEL_REGISTRADA)
+        self.assertEqual(PainelFalso.registradas, [{"id": "AST-1", "titulo": "Nota", "departamento": "Administração",
+                                                    "link": "https://agentes.exemplo.com.br/issues/AST-1"}])
+
+    def test_titulo_longo_e_cortado_no_registro(self):
+        texto, erro = self.chamar("criar_tarefa", {"departamento": "Crescimento", "titulo": "a" * 400,
+                                                   "descricao": "Y"}, painel=self.painel)
+        self.assertFalse(erro, texto)
+        self.assertEqual(json.loads(texto)["painel"], servidor.PAINEL_REGISTRADA)
+        self.assertEqual(len(PaperclipFalso.criadas[0]["title"]), 400)
+        self.assertEqual(len(PainelFalso.registradas[0]["titulo"]), 300)
+
+    def test_painel_fora_do_ar_nao_desfaz_a_tarefa(self):
+        texto, erro = self.criar(servidor.RegistroPainel("http://127.0.0.1:1", CHAVE_PAINEL))
+        self.assertFalse(erro, texto)
+        resultado = json.loads(texto)
+        self.assertEqual(resultado["id"], "AST-1")
+        self.assertIn("não consegui registrar no painel", resultado["painel"])
+        self.assertEqual(len(PaperclipFalso.criadas), 1)
+
+    def test_painel_recusa_a_chave_ou_responde_503(self):
+        texto, erro = self.criar(servidor.RegistroPainel(self.url_painel, "pnl_errada"))
+        self.assertFalse(erro, texto)
+        self.assertIn("recusou a chave", json.loads(texto)["painel"])
+        PainelFalso.status_forcado = 503
+        texto, erro = self.criar(self.painel)
+        self.assertFalse(erro, texto)
+        self.assertIn("503", json.loads(texto)["painel"])
+        self.assertEqual(PainelFalso.registradas, [])
+        self.assertEqual(len(PaperclipFalso.criadas), 2)
+
+    def test_sem_painel_configurado_nao_chama(self):
+        for painel in (None, servidor.RegistroPainel("", CHAVE_PAINEL), servidor.RegistroPainel(self.url_painel, "")):
+            texto, erro = self.criar(painel)
+            self.assertFalse(erro, texto)
+            self.assertEqual(json.loads(texto)["painel"], servidor.PAINEL_NAO_CONFIGURADO)
+        self.assertEqual(PainelFalso.registradas, [])
+
+    def test_painel_com_url_sem_http(self):
+        texto, erro = self.criar(servidor.RegistroPainel("file:///etc/passwd", CHAVE_PAINEL))
+        self.assertFalse(erro, texto)
+        self.assertIn("http", json.loads(texto)["painel"])
+
+    def test_tarefa_que_falha_nao_chama_o_painel(self):
+        _, erro = self.chamar("criar_tarefa", {"departamento": "Vendas", "titulo": "X", "descricao": "Y"},
+                              painel=self.painel)
+        self.assertTrue(erro)
+        self.assertEqual(PainelFalso.registradas, [])
 
     def test_lista_departamentos_sem_arquivados(self):
         texto, erro = self.chamar("listar_departamentos")
@@ -176,19 +269,26 @@ class TesteMcpPaperclip(unittest.TestCase):
             {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
              "params": {"name": "listar_departamentos", "arguments": {}}},
             {"jsonrpc": "2.0", "id": 4, "method": "recurso/inexistente"},
+            {"jsonrpc": "2.0", "id": 5, "method": "tools/call",
+             "params": {"name": "criar_tarefa",
+                        "arguments": {"departamento": "Crescimento", "titulo": "Por stdio", "descricao": "X"}}},
         ]
         entrada = "".join(json.dumps(m) + "\n" for m in mensagens)
-        ambiente = {**os.environ, "PAPERCLIP_API_URL": self.url, "PAPERCLIP_API_KEY": CHAVE}
+        ambiente = {**os.environ, "PAPERCLIP_API_URL": self.url, "PAPERCLIP_API_KEY": CHAVE,
+                    "PAINEL_API_URL": self.url_painel, "PAINEL_API_KEY": CHAVE_PAINEL}
         saida = subprocess.run([sys.executable, servidor.__file__], input=entrada, capture_output=True,
                                text=True, env=ambiente, timeout=30, check=True, encoding="utf-8").stdout
         respostas = [json.loads(linha) for linha in saida.splitlines()]
-        self.assertEqual([r["id"] for r in respostas], [1, 2, 3, 4])
+        self.assertEqual([r["id"] for r in respostas], [1, 2, 3, 4, 5])
         self.assertEqual(respostas[0]["result"]["protocolVersion"], "2025-06-18")
         self.assertEqual({f["name"] for f in respostas[1]["result"]["tools"]},
                          {"listar_departamentos", "criar_tarefa", "ver_tarefa"})
         self.assertFalse(respostas[2]["result"]["isError"])
         self.assertIn("Crescimento", respostas[2]["result"]["content"][0]["text"])
         self.assertEqual(respostas[3]["error"]["code"], -32601)
+        self.assertEqual(json.loads(respostas[4]["result"]["content"][0]["text"])["painel"],
+                         servidor.PAINEL_REGISTRADA)
+        self.assertEqual([r["titulo"] for r in PainelFalso.registradas], ["Por stdio"])
 
     def test_tools_call_sem_variaveis(self):
         resposta = servidor.tratar(

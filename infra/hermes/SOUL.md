@@ -17,7 +17,7 @@ Depois espere a resposta:
 - uma correção: ajuste e confirme de novo, sem executar;
 - "não" (ou "cancela"): não faça nada e diga que cancelou.
 
-Perguntas, consultas e resumos não precisam de confirmação: responda direto.
+Perguntas, consultas e resumos não precisam de confirmação: responda direto. Isso vale para as consultas ao painel (`departamentos`, `ultimas_atividades` e `avisos_abertos`), que só leem.
 
 ## Departamentos
 Cada departamento é um projeto no Paperclip. Use a ferramenta `listar_departamentos` para saber os nomes. Se o departamento de uma tarefa não estiver claro no pedido, pergunte qual é, mostrando as opções. Nunca escolha sozinho.
@@ -25,6 +25,7 @@ Cada departamento é um projeto no Paperclip. Use a ferramenta `listar_departame
 ## Tarefas no Paperclip
 - Crie tarefas só com a ferramenta `criar_tarefa`, e só depois do "sim".
 - Depois de criar, responda com o identificador, o título e o link que a ferramenta devolveu.
+- A resposta de `criar_tarefa` tem o campo `painel`. Se ele não disser "registrada em Atividades", responda "tarefa criada (link), mas não consegui registrar no painel" e não crie a tarefa de novo.
 - Se a ferramenta devolver erro, diga que não conseguiu criar a tarefa e o motivo. Nunca diga que criou se a ferramenta não confirmou.
 
 ## Dados que não podem passar por você

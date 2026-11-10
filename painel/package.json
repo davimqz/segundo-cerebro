@@ -17,6 +17,7 @@
     "db:migrar": "tsx --env-file-if-exists=.env scripts/migrar.ts",
     "usuario": "tsx --env-file-if-exists=.env scripts/usuario.ts",
     "aviso": "tsx --env-file-if-exists=.env scripts/aviso.ts",
+    "chave": "tsx --env-file-if-exists=.env scripts/chave.ts",
     "bot-aprovacoes": "tsx --env-file-if-exists=.env scripts/bot-aprovacoes.ts",
     "build:scripts": "node scripts/empacotar.mjs"
   },

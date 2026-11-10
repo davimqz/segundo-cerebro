@@ -1,4 +1,5 @@
 # Hermes (o agente que conversa pelo Telegram e cria tarefas no Paperclip). Spec 005, ADR 0007.
+# Consulta o painel e registra nele as tarefas criadas pelas rotas /api/v1 (spec 007, ADR 0009).
 # No servidor fica em /opt/asttra/hermes/ (cópia desta pasta), com o .env ao lado e os dados
 # (memória, sessões, skills, config.yaml e SOUL.md) em ./dados, que entra no backup diário.
 # Imagem oficial presa pelo digest (HERMES_IMAGEM). Precisa da rede "asttra" e do Paperclip no ar.
@@ -23,6 +24,7 @@ services:
     volumes:
       - ./dados:/opt/data
       - ./mcp-paperclip:/opt/asttra/mcp-paperclip:ro
+      - ./mcp-painel:/opt/asttra/mcp-painel:ro
     mem_limit: 1536m
     pids_limit: 256
     security_opt:

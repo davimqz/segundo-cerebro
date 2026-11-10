@@ -69,6 +69,8 @@ Ao fim desta etapa, Davi conversa com o Hermes pelo Telegram, aprova ações e v
      - Concluído em 2026-11-08: implantado no servidor (bot sem porta publicada, nenhuma chave ou token nos logs) e conferido por Davi de ponta a ponta: pedido no painel e no Telegram ao mesmo tempo, aprovação no painel atualizando o Telegram, aprovação no Telegram atualizando o painel, recusa com motivo no histórico e as decisões em Atividades. Falta conferir, de outra conta do Telegram, que o bot ignora a mensagem (coberto pelos testes automáticos).
 7. **Ponte do Hermes com o painel (servidor MCP):** o Hermes consulta e age no painel, registrando tudo em Atividades.
    - Pronto quando: um pedido no Telegram cria um registro no painel.
+   - Spec: [007](specs/007-ponte-hermes-painel.md). ADR [0009](adr/0009-chaves-de-agente-do-painel.md). Rotas `/api/v1` com chave por agente (`chaves_agentes`), MCP `painel` no Hermes (`infra/hermes/mcp-painel/`) e registro de `tarefa_criada` pelo `mcp-paperclip`; passo a passo no playbook, capítulo "Ponte do Hermes".
+   - Implementado em 2026-11-10 (branch `feat/007-ponte-hermes-painel`). Falta implantar no servidor e fazer a verificação de ponta a ponta (passos 88 a 93 do playbook).
 8. **n8n:** instalado, com `n8n-mcp`, ligado ao Gmail, Google Agenda e Google Drive.
    - Pronto quando: o Hermes lê a agenda e prepara um rascunho de e-mail para aprovação.
 9. **Graphify:** mapeando a base de conhecimento e o código do painel.

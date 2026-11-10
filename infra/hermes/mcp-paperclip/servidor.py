@@ -14,6 +14,12 @@ Variáveis de ambiente:
   PAPERCLIP_API_URL     endereço da API visto do container (ex.: http://paperclip:3100)
   PAPERCLIP_API_KEY     chave de agente do Hermes (gravada pelo configurar.sh)
   PAPERCLIP_URL_PUBLICA endereço público, para o link da tarefa (ex.: https://agentes.exemplo.com.br)
+  PAINEL_API_URL        endereço do painel visto do container (ex.: http://painel:3000); opcional
+  PAINEL_API_KEY        chave de agente do Hermes no painel (gravada pelo criar-chave-hermes.sh); opcional
+
+Depois de criar uma tarefa, registra-a em Atividades no painel (POST /api/v1/tarefas, spec 007). Se o
+painel falhar ou não estiver configurado, a tarefa continua criada e a resposta diz isso no campo
+"painel"; o registro não depende de o modelo lembrar de chamar outra ferramenta.
 """
 
 from __future__ import annotations
@@ -31,6 +37,11 @@ NOME = "paperclip"
 VERSAO = "1.0.0"
 PROTOCOLO_PADRAO = "2025-06-18"
 TEMPO_LIMITE = 20
+TEMPO_LIMITE_PAINEL = 10
+TITULO_MAXIMO_PAINEL = 300
+# Textos do campo "painel" na resposta de criar_tarefa (o SOUL.md orienta o Hermes por eles).
+PAINEL_REGISTRADA = "registrada em Atividades"
+PAINEL_NAO_CONFIGURADO = "registro no painel não configurado (falta PAINEL_API_URL ou PAINEL_API_KEY)"
 # Identificador de tarefa (AST-12) ou UUID: só letras, números, hífen e sublinhado.
 IDENTIFICADOR = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -44,7 +55,8 @@ FERRAMENTAS = [
     {
         "name": "criar_tarefa",
         "description": "Cria uma tarefa no Paperclip, no projeto do departamento indicado. "
-        "Só use depois que o Davi confirmar com 'sim' o departamento, o título e a descrição.",
+        "Só use depois que o Davi confirmar com 'sim' o departamento, o título e a descrição. "
+        "A resposta traz o campo 'painel', que diz se a tarefa também foi registrada no painel.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -177,7 +189,47 @@ class Paperclip:
         }
 
 
-def chamar_ferramenta(paperclip: Paperclip, nome: str, argumentos: dict) -> tuple[str, bool]:
+class RegistroPainel:
+    """Registra em Atividades, no painel, as tarefas criadas (POST /api/v1/tarefas)."""
+
+    def __init__(self, url: str, chave: str):
+        self.url = (url or "").rstrip("/")
+        self.chave = chave or ""
+
+    def registrar(self, tarefa: dict) -> str:
+        """Devolve o texto do campo "painel" da resposta. Nunca levanta exceção."""
+        if not self.url or not self.chave:
+            return PAINEL_NAO_CONFIGURADO
+        if urllib.parse.urlsplit(self.url).scheme not in ("http", "https"):
+            return "não consegui registrar no painel: PAINEL_API_URL precisa começar com http:// ou https://"
+        corpo = {k: tarefa.get(k) for k in ("id", "titulo", "departamento", "link")}
+        # O painel aceita até 300 caracteres no título; o Paperclip não tem esse limite.
+        corpo["titulo"] = str(corpo.get("titulo") or "")[:TITULO_MAXIMO_PAINEL]
+        pedido = urllib.request.Request(
+            f"{self.url}/api/v1/tarefas",
+            data=json.dumps(corpo).encode(),
+            method="POST",
+            headers={
+                "authorization": f"Bearer {self.chave}",
+                "accept": "application/json",
+                "content-type": "application/json",
+            },
+        )
+        try:
+            # O esquema foi conferido acima (só http/https) e o caminho é fixo.
+            with urllib.request.urlopen(pedido, timeout=TEMPO_LIMITE_PAINEL):  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+                return PAINEL_REGISTRADA
+        except urllib.error.HTTPError as erro:
+            erro.close()
+            if erro.code in (401, 403):
+                return f"não consegui registrar no painel: ele recusou a chave do Hermes (HTTP {erro.code})"
+            return f"não consegui registrar no painel (HTTP {erro.code})"
+        except (urllib.error.URLError, TimeoutError, OSError):
+            return "não consegui registrar no painel: fora do ar ou sem rede"
+
+
+def chamar_ferramenta(paperclip: Paperclip, nome: str, argumentos: dict,
+                      painel: RegistroPainel | None = None) -> tuple[str, bool]:
     """Executa a ferramenta. Devolve (texto, deu_erro)."""
     try:
         if nome == "listar_departamentos":
@@ -188,6 +240,8 @@ def chamar_ferramenta(paperclip: Paperclip, nome: str, argumentos: dict) -> tupl
                 str(argumentos.get("titulo", "")),
                 str(argumentos.get("descricao", "")),
             )
+            # A tarefa já existe no Paperclip: uma falha aqui não vira erro da ferramenta.
+            resultado["painel"] = (painel or RegistroPainel("", "")).registrar(resultado)
         elif nome == "ver_tarefa":
             resultado = paperclip.ver_tarefa(str(argumentos.get("id", "")))
         else:
@@ -197,7 +251,7 @@ def chamar_ferramenta(paperclip: Paperclip, nome: str, argumentos: dict) -> tupl
     return json.dumps(resultado, ensure_ascii=False), False
 
 
-def tratar(mensagem: dict, obter_paperclip) -> dict | None:
+def tratar(mensagem: dict, obter_paperclip, painel: RegistroPainel | None = None) -> dict | None:
     """Responde a uma mensagem JSON-RPC. Notificações (sem id) não têm resposta."""
     metodo = mensagem.get("method")
     ident = mensagem.get("id")
@@ -224,13 +278,15 @@ def tratar(mensagem: dict, obter_paperclip) -> dict | None:
         except ErroPaperclip as erro:
             texto, erro_ = f"Não deu certo: {erro} Nada foi criado nem alterado.", True
         else:
-            texto, erro_ = chamar_ferramenta(paperclip, parametros.get("name", ""), parametros.get("arguments") or {})
+            texto, erro_ = chamar_ferramenta(paperclip, parametros.get("name", ""), parametros.get("arguments") or {},
+                                             painel)
         return ok({"content": [{"type": "text", "text": texto}], "isError": erro_})
     return {"jsonrpc": "2.0", "id": ident, "error": {"code": -32601, "message": f"Método não suportado: {metodo}"}}
 
 
 def main() -> None:
     cache: list[Paperclip] = []
+    painel = RegistroPainel(os.environ.get("PAINEL_API_URL", ""), os.environ.get("PAINEL_API_KEY", ""))
 
     def obter_paperclip() -> Paperclip:
         if not cache:
@@ -250,7 +306,7 @@ def main() -> None:
         except json.JSONDecodeError:
             resposta = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "JSON inválido"}}
         else:
-            resposta = tratar(mensagem, obter_paperclip) if isinstance(mensagem, dict) else None
+            resposta = tratar(mensagem, obter_paperclip, painel) if isinstance(mensagem, dict) else None
         if resposta is not None:
             sys.stdout.write(json.dumps(resposta, ensure_ascii=False) + "\n")
             sys.stdout.flush()

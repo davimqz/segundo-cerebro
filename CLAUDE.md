@@ -102,8 +102,9 @@ Não use "Sustentação" como nome de departamento: é o nome do contrato mensal
 - Testes de integração: `scripts/teste-painel.sh` (PostgreSQL descartável) e `scripts/teste-banco.sh` (sobe `infra/banco` com senhas de teste); os dois rodam sempre no CI
 - Paperclip: `scripts/teste-paperclip.sh` sobe banco e Paperclip (imagem oficial por digest, ADR 0006) e testa admin, `configurar.sh` e aprovação. Fica fora do `check.sh` e, no CI, roda só quando `infra/paperclip` muda. No Git Bash, caminhos do container vão dentro de `sh -c`, e corpo JSON com acento vai pela entrada padrão do `curl`
 - Hermes: `scripts/teste-hermes.sh` sobe banco, Paperclip e Hermes e testa rede, `configurar.sh`, ferramentas desligadas e o MCP. Fica fora do `check.sh` e, no CI, roda só quando `infra/hermes` ou `infra/paperclip` muda. Os testes de unidade do MCP rodam no `check.sh`
-- E2E: `scripts/teste-e2e.sh` (sobe banco, painel, bot e um Paperclip falso pelo `infra/painel/compose.yml` e roda o Playwright; precisa de `pnpm --dir painel exec playwright install chromium`)
+- E2E: `scripts/teste-e2e.sh` (sobe banco, painel, bot e um Paperclip falso pelo `infra/painel/compose.yml`, testa o `criar-chave-hermes.sh` e as rotas `/api/v1` e roda o Playwright; precisa de `pnpm --dir painel exec playwright install chromium`)
 - Aprovações: o contrato do Paperclip que o painel usa é conferido no `scripts/teste-paperclip.sh`; o bot e as Server Actions têm testes de integração com Paperclip e Telegram falsos (`painel/src/test/falsos.ts`)
+- API dos agentes (spec 007, ADR 0009): rotas em `painel/src/app/api/v1/`, protegidas por chave de agente (`chaves_agentes`, só o hash). Chaves pelo comando `pnpm --dir painel chave criar|listar|revogar`; a do Hermes, no servidor, por `infra/painel/criar-chave-hermes.sh`. O MCP `painel` do Hermes fica em `infra/hermes/mcp-painel/`
 
 ## Design
 
@@ -149,5 +150,5 @@ Quando uma decisão mudar, atualize o doc correspondente e este arquivo no mesmo
 - **Git:** branch por tarefa e PR para `main`. Conventional Commits em português.
 ## Próximo passo
 
-1. Etapa 1, item 7 (ponte do Hermes com o painel): implementar a spec 007, aprovada em 2026-11-10, numa sessão limpa. O item 6 (Hermes no Telegram e aprovações) foi concluído em 2026-11-08.
+1. Etapa 1, item 7 (ponte do Hermes com o painel): spec 007 implementada em 2026-11-10 (branch `feat/007-ponte-hermes-painel`). Falta o PR (R2, entra com a aprovação do Davi), a implantação e a verificação de ponta a ponta (playbook, passos 88 a 93).
 2. Pendente do item 6b: conferir, de outra conta do Telegram, que o bot de aprovações ignora a mensagem (passo 87.6 do playbook).

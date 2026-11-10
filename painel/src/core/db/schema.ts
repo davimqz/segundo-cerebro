@@ -122,6 +122,33 @@ export const aprovacoesTelegram = pgTable("aprovacoes_telegram", {
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ─── Chaves de agente (spec 007, ADR 0009) ──────────────────────────────────────
+// Dão acesso às rotas /api/v1. Guarda só o SHA-256 da chave; a chave aparece uma única vez, ao criar.
+
+export const ESCOPOS = ["departamentos:ler", "atividades:ler", "avisos:ler", "tarefas:registrar"] as const;
+export type Escopo = (typeof ESCOPOS)[number];
+
+export const chavesAgentes = pgTable(
+  "chaves_agentes",
+  {
+    id: serial("id").primaryKey(),
+    // Quem usa a chave (ex.: hermes). Vira o autor das atividades gravadas pelas rotas.
+    agente: text("agente").notNull(),
+    hash: text("hash").notNull().unique(),
+    escopos: text("escopos").array().$type<Escopo[]>().notNull(),
+    criadaEm: timestamp("criada_em", { withTimezone: true }).notNull().defaultNow(),
+    // Vazio = ativa.
+    revogadaEm: timestamp("revogada_em", { withTimezone: true }),
+  },
+  (t) => [
+    check(
+      "chaves_agentes_escopos",
+      sql`${t.escopos} <@ array[${sql.raw(ESCOPOS.map((e) => `'${e}'`).join(", "))}]::text[]`,
+    ),
+    index("chaves_agentes_agente").on(t.agente),
+  ],
+);
+
 // ─── Login (Better Auth, ADR 0004) ──────────────────────────────────────────────
 // Os nomes das propriedades seguem os campos do Better Auth; as tabelas e colunas, o padrão do banco.
 
