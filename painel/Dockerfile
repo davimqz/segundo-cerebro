@@ -1,7 +1,7 @@
 # Imagem do painel (ADR 0005: construída no próprio servidor).
 # Saída standalone do Next, roda como usuário sem root e aplica as migrações antes de abrir.
 
-FROM node:26.12.0-trixie-slim AS base
+FROM node:26.13.0-trixie-slim AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm install -g pnpm@12.6.0 && npm cache clean --force
 
